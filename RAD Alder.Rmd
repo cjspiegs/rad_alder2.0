@@ -22,7 +22,7 @@ i) How does dispersal from the regional species pool (i.e., source communities) 
 ii) How does microbial community composition (alpha and beta diversity) and function differ between the leaf packs, as well as change over the course of decomposition?
 iii) How does alder stoichiometric and secondary chemical composition differ between the leaf packs, as well as change over the course of decomposition?
 iv) How does microbial metabolization differ between the leaf packs, as well as change over the course of decomposition?
-v) How does particulate leaf mass loss differ between the leaf packs? 
+v) How does particulate leaf mass loss differ between the leaf packs?
 
 
 **DATA SETS**  
