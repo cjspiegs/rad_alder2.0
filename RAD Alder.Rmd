@@ -69,17 +69,17 @@ We measured absorbance at 450 nm (see Blenkinsopp & Lock, 1990; Friedel et al., 
 ```{r}
 #add data files
 #day 1
-meta.day1.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/assay/day_1_450_clean.csv")
+meta.day1.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/assay/day_1_450_clean.csv")
 #day 3
-meta.day3.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/assay/day_3_450_clean.csv")
+meta.day3.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/assay/day_3_450_clean.csv")
 #day 5
-meta.day5.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/assay/day_5_450_clean.csv")
+meta.day5.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/assay/day_5_450_clean.csv")
 #day 7
-meta.day7.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/assay/day_7_450_clean.csv")
+meta.day7.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/assay/day_7_450_clean.csv")
 #day 11
-meta.day11.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/assay/day_11_450_clean.csv")
+meta.day11.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/assay/day_11_450_clean.csv")
 #day 17
-meta.day17.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/assay/day_17_450_clean.csv")
+meta.day17.450.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/assay/day_17_450_clean.csv")
 
 #merge all days 450nm
 meta.450.df<- rbind(
