@@ -16,7 +16,7 @@ output:
 ---
 
 ### Project overview
-Project ‘RAD’ Alder explores the role of resident leaf-associated microbes presence (P) and absence (i.e., (AB) gamma irradiated) leaf packs deployed at “home” (H) and “away” (AW) rivers in leaf litter decomposition. We utilized a reciprocal transplant experiment between two rivers, the Hoko (HOK) and the Sekiu (SEK), on the WA state Olympic Peninsula. This 2x2 factorial design yielded four treatments: 1) P-H, 2) P-AW, 3) AB-H, and 4) AB-AW and we asked the following questions: 
+Project ‘RAD’ Alder explores the role of resident leaf-associated microbes presence (P) and absence (i.e., (AB) gamma irradiated) leaf packs deployed at “home” (H) and “away” (AW) rivers in leaf litter decomposition. We utilized a reciprocal transplant experiment between two rivers, the Hoko (HOK) and the Sekiu (SEK), on the WA state Olympic Peninsula. This 2x2 factorial design yielded four treatments: 1) P-H, 2) P-AW, 3) AB-H, and 4) AB-AW and we asked the following questions:
 
 i) How does dispersal from the regional species pool (i.e., source communities) influence community composition on the leaf packs?
 ii) How does microbial community composition (alpha and beta diversity) and function differ between the leaf packs, as well as change over the course of decomposition?
