@@ -5577,12 +5577,4 @@ merged_df <- norm %>%
 
 # Select the columns of interest
 result_df <- merged_df %>%
-  select(row.ID, compound_name, compound_class, starts_with("sample"))
-
-print(result_df)
-
-
-
-
-```
-
+  select(row.ID, compound_name, compound_class, star
