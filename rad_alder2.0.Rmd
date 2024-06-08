@@ -207,7 +207,7 @@ true_home.16.meta.df<- true_home.16.meta.df %>%
 #double check log transformed normality
 true_home.16.meta.df%>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
-  pull(trans_od)%>%
+  pull(log_od)%>%
   normalTest(method = "da")
 ```
 
@@ -282,7 +282,7 @@ Below are a few ways to visualize the data
 ```{r}
 #boxplot 
 true_home.16.meta.df %>%
-  ggplot(aes(x = group, y = trans_od, fill = treatment, color = treatment, alpha = 0.4)) +
+  ggplot(aes(x = group, y = log_od, fill = treatment, color = treatment, alpha = 0.4)) +
   geom_point(aes(color = treatment), alpha = 0.4)+
   geom_boxplot(alpha = 0.4)+
   facet_grid(~decomp_day)+
@@ -380,7 +380,6 @@ true_home.16.meta_subset.df <- true_home.16.meta.df %>%
 # Filter based on the new column
 filtered_data <- true_home.16.meta_subset.df %>%
   filter(keep_row == TRUE)
-View(filtered_data)
 
 filtered_data %>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, group)%>%
@@ -5517,4 +5516,3 @@ print(result_df)
 
 ```
 
- 
