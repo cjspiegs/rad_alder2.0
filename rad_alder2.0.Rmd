@@ -256,7 +256,10 @@ meta_bigmod3<- lmer(log_od ~ treatment * group + (1 | decomp_day)  + (1 | deploy
 
 #compare
 AIC(meta_bigmod, meta_bigmod2, meta_bigmod3)
+```
 
+Big mod selection
+```{r}
 #can we remove any predictors
 step(meta_bigmod3)
 
@@ -271,35 +274,6 @@ normalTest(resid(meta_bestmod), method = "da")
 meta_bestmod<- glmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset = od_corrected_b_n>= 0, family = Gamma(link = "log"), data = true_home.16.meta.df)
 #create a big null mod
 meta_nullmod<- glmer(od_corrected_b_n ~  (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset = od_corrected_b_n>= 0, family = Gamma(link = "log"), data = true_home.16.meta.df)
-
-##best home model
-meta_homemod<- glmer(od_corrected_b_n ~ treatment + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link= "log"), data = true_home.16.meta.df)
-
-#check the best mod
-plot(resid(meta_homemod))
-hist(resid(meta_homemod))
-normalTest(resid(meta_homemod), method = "da")
-
-#create a home null mod
-meta_homenullmod<- glmer(od_corrected_b_n ~ (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link= "log"), data = true_home.16.meta.df)
-
-#compare the best vs null
-anova(meta_homenullmod, meta_homemod)
-
-#mod summary
-summary(meta_homemod)
-Anova(meta_homemod)
-#mean difference p vs ab
-exp(0.08119) + exp(0.21973 )
-2.330317/1.084577
-#confidence intervals
-homemod_fixed <- fixef(meta_homemod)
-se <- sqrt(diag(vcov(meta_homemod)))
-#calculation
-lower_ci <- exp(homemod_fixed - 1.96 * se)
-lower_ci
-upper_ci <- exp(homemod_fixed + 1.96 * se)
-upper_ci
 
 # Exponentiate the confidence intervals to get them back to the original scale
 exp_conf_int <- exp(conf_int)
@@ -321,6 +295,60 @@ decomp_pairs_df <- as.data.frame(decomp_pairs)
 #filter out rows containing "AB AW"
 filtered_decomp_pairs <- decomp_pairs_df %>%
   filter(!grepl("AB AW", contrast))
+```
+
+Mod for at home only
+```{r}
+##best home model
+meta_homemod<- glmer(od_corrected_b_n ~ treatment + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link= "log"), data = true_home.16.meta.df)
+
+meta_homemod2<- glmer(od_corrected_b_n ~ treatment + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = gaussian(link= "log"), data = true_home.16.meta.df)
+
+AIC(meta_homemod,meta_homemod2)
+
+#check the best home mod
+plot(resid(meta_homemod))
+hist(resid(meta_homemod))
+normalTest(resid(meta_homemod), method = "da")
+
+#create a home null mod
+meta_homenullmod<- glmer(od_corrected_b_n ~ (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link= "log"), data = true_home.16.meta.df)
+
+#compare the best vs null
+anova(meta_homenullmod, meta_homemod)
+
+#mod summary
+summary(meta_homemod)
+Anova(meta_homemod)
+#mean difference p vs ab
+#estimate for absent
+exp(0.08119)
+#estimate for present
+exp(0.21973 )
+exp(0.08119)+exp(0.21973 )
+#calculate times greater...
+2.330317/1.084577
+#confidence intervals
+homemod_fixed <- fixef(meta_homemod)
+se <- sqrt(diag(vcov(meta_homemod)))
+#calculation
+lower_ci <- exp(homemod_fixed - 1.96 * se)
+lower_ci
+upper_ci <- exp(homemod_fixed + 1.96 * se)
+upper_ci
+
+#####look within each decomposition day
+#day 1
+t.test(true_home.16.meta.df[true_home.16.meta.df$treatment=="P",])
+meta_day1mod<- glmer(od_corrected_b_n ~ treatment + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H" &  decomp_day == "3" , family = Gamma(link= "log"), data = true_home.16.meta.df)
+#check mod
+plot(resid(meta_day1mod))
+hist(resid(meta_day1mod))
+#day 1 null
+meta_nullday1mod<- glmer(od_corrected_b_n ~ (1 | deploy) + (1 | site_num:tree_num), subset= group == "H" &  decomp_day == "3" , family = Gamma(link= "log"), data = true_home.16.meta.df)
+#compare
+
+
 
 ```
 
@@ -383,13 +411,13 @@ meta.homeonly_plot<- true_home.16.meta.df %>%
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
   geom_hline(aes(yintercept = mean(log_od)), color = "red3", linetype = "dashed") +
-  labs(x = "Decomposition Day", y = expression("log(OD"[450 * nm]*")")) +
+  labs(x = "Decomposition day", y = expression("log(OD"[450 * nm]*")")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
   theme_bw() +
-  theme(axis.text = element_text(size = 16),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 16),
-        legend.title = element_text(size = 16))
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
 
 ggsave("figures/meta.homeonly_plot.png", meta.homeonly_plot, width = 14, height = 7)
 
