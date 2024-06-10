@@ -150,6 +150,13 @@ deploy.hok_only.df<- meta.450.df[meta.450.df$deploy=="HOK" & meta.450.df$tree_id
 deploy.sek_only.df<- meta.450.df[meta.450.df$deploy=="SEK" & meta.450.df$tree_id=="SEK",]
 #merge
 true_home.meta.df<- rbind(deploy.hok_only.df, deploy.sek_only.df)
+#make colummn factors
+true_home.meta.df$treatment<- as.factor(true_home.meta.df$treatment)
+true_home.meta.df$tree_id<- as.factor(true_home.meta.df$tree_id)
+true_home.meta.df$deploy<- as.factor(true_home.meta.df$deploy)
+true_home.meta.df$metabolite<- true_home.meta.df(meta.450.df$metabolite)
+true_home.meta.df$group<- as.factor(true_home.meta.df$group)
+true_home.meta.df$hours<- as.factor(true_home.meta.df$hours)
 
 ##### false home/away #####
 
@@ -169,9 +176,16 @@ Explore and visualize the corrected OD at 24 hr, 450 nm
 true_home.16.meta.df<- true_home.meta.df%>%
   na.omit()%>%
   filter(hours == "16")
-
-#decomp_day as factor
-true_home.16.meta.df$decomp_day<- factor(true_home.16.meta.df$decomp_day) 
+#convert classes
+true_home.16.meta.df$treatment<- as.factor(true_home.16.meta.df$treatment)
+true_home.16.meta.df$tree_id<- as.factor(true_home.16.meta.df$tree_id)
+true_home.16.meta.df$deploy<- as.factor(true_home.16.meta.df$deploy)
+true_home.16.meta.df$decomp_day<- as.factor(true_home.16.meta.df$decomp_day)
+true_home.16.meta.df$site_num<- as.factor(true_home.16.meta.df$site_num)
+true_home.16.meta.df$tree_num<- as.factor(true_home.16.meta.df$tree_num)
+true_home.16.meta.df$metabolite<- as.factor(true_home.16.meta.df$metabolite)
+true_home.16.meta.df$group<- as.factor(true_home.16.meta.df$group)
+true_home.16.meta.df$hours<- as.factor(true_home.16.meta.df$hours)
 
 #general plot 
 true_home.16.meta.df %>%
@@ -190,12 +204,16 @@ true_home.16.meta.df%>%
   pull(mean_od)%>%
   hist()
 
+true_home.16.meta.df%>%
+  group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day,group)%>%
+  pull(od_corrected_b_n)%>%
+  hist()
+
 #normality test 
 library(fBasics)
 true_home.16.meta.df%>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
-  mutate(mean_od = mean(od_corrected_b_n))%>%
-  pull(mean_od)%>%
+  pull(od_corrected_b_n)%>%
   normalTest(method = "da")
 #corrected od is not normally distributed. Apply log transformation.
 
@@ -208,6 +226,11 @@ true_home.16.meta.df<- true_home.16.meta.df %>%
 true_home.16.meta.df%>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
   pull(log_od)%>%
+  normalTest(method = "da")
+
+true_home.16.meta.df%>%
+  group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
+  pull(box_od)%>%
   normalTest(method = "da")
 ```
 
@@ -238,23 +261,48 @@ AIC(meta_bigmod, meta_bigmod2, meta_bigmod3)
 step(meta_bigmod3)
 
 #even though the step function removes deploy, there is inherent variation——and the difference in df and AIC is small. We will keep random effect deploy
+##best big model
 meta_bestmod<- lmer(log_od ~ treatment * group + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num) , data = true_home.16.meta.df)
-
 #check the best mod
 plot(resid(meta_bestmod))
 hist(resid(meta_bestmod))
 normalTest(resid(meta_bestmod), method = "da")
-vif(meta_bestmod)
+#filter out negative values
+meta_bestmod<- glmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset = od_corrected_b_n>= 0, family = Gamma(link = "log"), data = true_home.16.meta.df)
+#create a big null mod
+meta_nullmod<- glmer(od_corrected_b_n ~  (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset = od_corrected_b_n>= 0, family = Gamma(link = "log"), data = true_home.16.meta.df)
 
-#create a null mod
-meta_nullmod<- lmer(log_od ~ (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num) , data = true_home.16.meta.df)
+##best home model
+meta_homemod<- glmer(od_corrected_b_n ~ treatment + (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link= "log"), data = true_home.16.meta.df)
+
+#check the best mod
+plot(resid(meta_homemod))
+hist(resid(meta_homemod))
+normalTest(resid(meta_homemod), method = "da")
+
+#create a home null mod
+meta_homenullmod<- glmer(od_corrected_b_n ~ (1 | deploy) + (1 | decomp_day) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link= "log"), data = true_home.16.meta.df)
 
 #compare the best vs null
-anova(meta_nullmod, meta_bestmod)
+anova(meta_homenullmod, meta_homemod)
 
 #mod summary
-summary(meta_bestmod)
-exp(coef(summary(meta_bestmod)))
+summary(meta_homemod)
+Anova(meta_homemod)
+#mean difference p vs ab
+exp(0.08119) + exp(0.21973 )
+2.330317/1.084577
+#confidence intervals
+homemod_fixed <- fixef(meta_homemod)
+se <- sqrt(diag(vcov(meta_homemod)))
+#calculation
+lower_ci <- exp(homemod_fixed - 1.96 * se)
+lower_ci
+upper_ci <- exp(homemod_fixed + 1.96 * se)
+upper_ci
+
+# Exponentiate the confidence intervals to get them back to the original scale
+exp_conf_int <- exp(conf_int)
 
 #estimate marginal means
 ##we need to add decomp_day as a fixed effect to see pairwise
@@ -274,13 +322,12 @@ decomp_pairs_df <- as.data.frame(decomp_pairs)
 filtered_decomp_pairs <- decomp_pairs_df %>%
   filter(!grepl("AB AW", contrast))
 
-View(filtered_decomp_pairs)
 ```
 
 
 Below are a few ways to visualize the data
 ```{r}
-#boxplot 
+#general boxplot 
 true_home.16.meta.df %>%
   ggplot(aes(x = group, y = log_od, fill = treatment, color = treatment, alpha = 0.4)) +
   geom_point(aes(color = treatment), alpha = 0.4)+
@@ -290,11 +337,7 @@ true_home.16.meta.df %>%
    guides(linetype = guide_legend(override.aes = list(color = "cornflowerblue")))+
   theme_bw()
 
-#mean with SE 
-#global mean across days
-mean_trans_od <- mean(true_home.16.meta.df$trans_od, na.rm = TRUE)
-
-#big interaction plot
+#big interaction plot: all treatments
 meta.interact_plot<- true_home.16.meta.df %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = group, shape = treatment)) +
   stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
@@ -311,7 +354,7 @@ meta.interact_plot<- true_home.16.meta.df %>%
 
 ggsave("figures/meta.interact_plot.png", meta.interact_plot, width = 14, height = 7)
 
-#big interaction w/ 4 groups
+#big interaction w/ 4 separate treatment groups
 meta.biginteract_plot<- true_home.16.meta.df %>%
   mutate(group_treatment = factor(interaction(group, treatment), 
                                   levels = c("AW.P", "AW.AB", "H.P", "H.AB"))) %>%
@@ -331,7 +374,7 @@ meta.biginteract_plot<- true_home.16.meta.df %>%
 
 ggsave("figures/meta.biginteract_plot.png", meta.biginteract_plot, width = 14, height = 7)
 
-### at home——p vs ab plot
+###at home only——present vs absent plot
 meta.homeonly_plot<- true_home.16.meta.df %>%
   filter(group == "H") %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = treatment, shape = treatment)) +
@@ -350,7 +393,7 @@ meta.homeonly_plot<- true_home.16.meta.df %>%
 
 ggsave("figures/meta.homeonly_plot.png", meta.homeonly_plot, width = 14, height = 7)
 
-### just p——h vs aw plot
+###just present treatment——home vs away plot
 meta.ponly_plot<- true_home.16.meta.df %>%
   filter(treatment == "P") %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = group, shape = group)) +
@@ -371,7 +414,6 @@ meta.ponly_plot
 
 ggsave("figures/meta.ponly_plot.png", meta.ponly_plot, width = 14, height = 7)
 
-
 ##present and abesent at home, as well as present at away (exlude absent/away)
 # Add a column to mark rows to keep
 true_home.16.meta_subset.df <- true_home.16.meta.df %>%
@@ -380,7 +422,7 @@ true_home.16.meta_subset.df <- true_home.16.meta.df %>%
 # Filter based on the new column
 filtered_data <- true_home.16.meta_subset.df %>%
   filter(keep_row == TRUE)
-
+#filter again
 filtered_data %>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, group)%>%
   filter(group == "AW" & treatment == "P") %>%
