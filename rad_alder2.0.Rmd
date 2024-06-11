@@ -304,20 +304,22 @@ decomp_pairs_df
 ```
 
 
-Mod for at home only
+Model for at home only
 ```{r}
 ##best big home model
 meta_bighomemod<- lmer(log_od ~ treatment + (treatment | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
 
-meta_home_glmermod<- glmer(od_corrected_b_n ~ treatment + (treatment | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", family = Gamma(link = "log"), data = true_home.16.meta.df)
+meta_bighomemod2<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+
+meta_bighomemod3<- lmer(log_od ~ treatment + (0 + treatment| decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
 
 #compare
-AIC(meta_bighomemod,meta_home_glmermod)
+AIC(meta_bighomemod,meta_bighomemod2, meta_bighomemod3)
                            
 #check the best home mod
 plot(resid(meta_bighomemod))
 hist(resid(meta_bighomemod))
-normalTest(resid(meta_bighomemod), method = "da")
+normalTest(resid(meta_bighomemod2), method = "da")
 
 #create a home null mod
 meta_homenullmod<- lmer(log_od ~  (treatment | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
@@ -346,14 +348,22 @@ upper_ci <- exp(bighomemod_fixed + 1.96 * se)
 upper_ci
 
 #estimate marginal means
-#maybe we can see pairwise among decomp day
-meta_home_decompmod<- lmer(log_od ~ treatment * decomp_day + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+#maybe we can see pairwise among decomp day w/ interaction
+meta_home_inter_decompmod<- lmer(log_od ~ treatment * decomp_day + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+
+#holding decomposition day 
+meta_home_add_decompmod<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+
+AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
 
 #check out mod
 plot(resid(meta_home_decompmod))
 hist(resid(meta_home_decompmod))
 #summary
-summary(meta_home_decompmod)
+summary(meta_home_add_decompmod)
+#backtransformed
+exp(summary(meta_home_decompmod)$coefficients)
+
 #means
 home_decomp_means <- emmeans(meta_home_decompmod2, ~ treatment : decomp_day)
 #extract the emmeans results
@@ -363,7 +373,6 @@ home_decomp_means_df$emmean <- exp(home_decomp_means_df$emmean)
 home_decomp_means_df$lower.CL <- exp(home_decomp_means_df$lower.CL)
 home_decomp_means_df$upper.CL <- exp(home_decomp_means_df$upper.CL)
 home_decomp_means_df
-pairs(home_decomp_means, adjust = "tukey")
 
 #perform pairwise comparisons on the original log-scale emmeans
 home_decomp_pairs <- as.data.frame(pairs(home_decomp_means))
@@ -373,11 +382,7 @@ home_decomp_pairs$estimate <- exp(home_decomp_pairs$estimate)
 home_decomp_pairs$SE <- exp(home_decomp_pairs$SE)
 #add sig column
 home_decomp_pairs$significant <- home_decomp_pairs$p.value < 0.05
-
- home_decomp_pairs %>%
-  group_by(estimate) %>%
-  filter(n() > 1)
-
+View(home_decomp_pairs)
 ##plot
 ggplot(home_decomp_pairs, aes(x = contrast, y = estimate, ymin = estimate - SE, ymax = estimate + SE, color = significant)) +
   geom_pointrange() +
