@@ -360,12 +360,12 @@ AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
 plot(resid(meta_home_decompmod))
 hist(resid(meta_home_decompmod))
 #summary
-summary(meta_home_add_decompmod)
+summary(meta_home_inter_decompmod)
 #backtransformed
 exp(summary(meta_home_decompmod)$coefficients)
 
 #means
-home_decomp_means <- emmeans(meta_home_decompmod2, ~ treatment : decomp_day)
+home_decomp_means <- emmeans(meta_home_inter_decompmod, ~ treatment : decomp_day)
 #extract the emmeans results
 home_decomp_means_df <- as.data.frame(home_decomp_means)
 #manually back-transform the estimates
@@ -383,6 +383,7 @@ home_decomp_pairs$SE <- exp(home_decomp_pairs$SE)
 #add sig column
 home_decomp_pairs$significant <- home_decomp_pairs$p.value < 0.05
 View(home_decomp_pairs)
+head(home_decomp_pairs)
 ##plot
 ggplot(home_decomp_pairs, aes(x = contrast, y = estimate, ymin = estimate - SE, ymax = estimate + SE, color = significant)) +
   geom_pointrange() +
@@ -450,7 +451,7 @@ meta.biginteract_plot<- true_home.16.meta.df %>%
 ggsave("figures/meta.biginteract_plot.png", meta.biginteract_plot, width = 14, height = 7)
 
 ###at home only——present vs absent plot
-meta.homeonly_plot<- true_home.16.meta.df %>%
+meta.homeonly_plot %>%
   filter(group == "H") %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = treatment, shape = treatment)) +
   stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
