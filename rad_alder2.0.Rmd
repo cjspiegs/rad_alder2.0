@@ -450,6 +450,7 @@ meta.biginteract_plot<- true_home.16.meta.df %>%
 
 ggsave("figures/meta.biginteract_plot.png", meta.biginteract_plot, width = 14, height = 7)
 
+
 ###at home only——present vs absent plot
 meta.homeonly_plot %>%
   filter(group == "H") %>%
