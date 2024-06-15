@@ -221,16 +221,23 @@ true_home.16.meta.df%>%
 true_home.16.meta.df<- true_home.16.meta.df %>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
   mutate(log_od = log(od_corrected_b_n))
-
-#double check log transformed normality
+#normality
+true_home.16.meta.df%>%
+  filter(treatment == "P", group == "H")%>%
+  group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
+ pull(log_od)%>%
+  hist()
+#normality
+true_home.16.meta.df%>%
+  filter(treatment == "AB", group == "H")%>%
+  group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
+ pull(log_od)%>%
+  hist()
+  
+#double check log transformed normality for all
 true_home.16.meta.df%>%
   group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
   pull(log_od)%>%
-  normalTest(method = "da")
-
-true_home.16.meta.df%>%
-  group_by(treatment, tree_id, deploy, metabolite, site_num, tree_num, decomp_day, group)%>%
-  pull(box_od)%>%
   normalTest(method = "da")
 
 ```
@@ -350,10 +357,19 @@ upper_ci
 #estimate marginal means
 #maybe we can see pairwise among decomp day w/ interaction
 meta_home_inter_decompmod<- lmer(log_od ~ treatment * decomp_day + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+summary(meta_home_inter_decompmod)
+
+meta_home_add_decompmod<- lmer(log_od ~ treatment +  decomp_day + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+
+
+#compare with global home mod
+AIC(meta_home_inter_decompmod,meta_bighomemod )
+anova(meta_home_inter_decompmod,meta_bighomemod )
 
 #holding decomposition day 
 meta_home_add_decompmod<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
 
+anova(meta_home_inter_decompmod,meta_home_add_decompmod )
 AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
 
 #check out mod
@@ -375,7 +391,7 @@ home_decomp_means_df$upper.CL <- exp(home_decomp_means_df$upper.CL)
 home_decomp_means_df
 
 #perform pairwise comparisons on the original log-scale emmeans
-home_decomp_pairs <- as.data.frame(pairs(home_decomp_means))
+home_decomp_pairs <- as.data.frame(pairs(home_decomp_means, adjust = "tukey"))
 
 #convert the estimates from log scale to response scale (exponentiation)
 home_decomp_pairs$estimate <- exp(home_decomp_pairs$estimate)
@@ -399,7 +415,6 @@ ggplot(home_decomp_pairs, aes(x = contrast, y = estimate, ymin = estimate - SE, 
     color = "Significant")
 
 ```
-
 
 Below are a few ways to visualize the data
 ```{r}
@@ -572,15 +587,17 @@ true_home.sek2.zscore.df <- true_home.16.meta.df %>%
   filter(deploy == "SEK" & site_num == "2") %>%
   mutate(z_score = (od_corrected_b_n - mean(od_corrected_b_n)) / sd(od_corrected_b_n))
 
-
 #merge sek 
 true_home.sek.zscore.df<- rbind(true_home.sek1.zscore.df, true_home.sek2.zscore.df)
 
 ##merge sek and hok
 true_home.zscore.df<- rbind(true_home.hok.zscore.df,true_home.sek.zscore.df)
+View(true_home.zscore.df)
+class(true_home.zscore.df$group)
 
-#normality test
-hist(true_home.zscore.df$z_score)
+#normality
+hist(true_home.zscore.df[true_home.zscore.df$group == "H" & true_home.zscore.df$treatment == "AB",]$z_score)
+
 normalTest(true_home.zscore.df$z_score, method = "da")
 
 #plot
@@ -600,163 +617,6 @@ true_home.zscore.df %>%
 ```
 
 
-hypothesis testing
-```{r}
-#day 1
-day1.lm<- lm(trans.od ~ treatment, subset = decomp_day == "1" & group == "H", data = merged.true_home_z.df)
-plot(day1.lm)
-summary(day1.lm)
-
-step(day1.lm)
-
-day1.lmer<- lmer(trans.od ~ treatment + (1| tree_num) + (1| site_num) + (1 | deploy) + (1 | tree_id), subset = decomp_day == "1" & group == "H", data = merged.true_home_z.df)
-
-day1.lmer<- lmer(trans.od ~ treatment +  (1 | tree_num), subset = decomp_day == "1" & group == "H", data = merged.true_home_z.df)
-
-AIC(day1.lm, day1.lmer)
-
-plot(day1.lmer)
-summary(day1.lmer)
-step(day1.lmer)
-
-
-```
-
-
-Visualization
-```{r}
-
-#true home using transformed
-merged.true_home_z.df%>%
-  na.omit()%>%
-  filter(group == "H")%>%
-  ggplot(aes(x = as.factor(decomp_day), y = trans.od, fill = treatment)) +
-  geom_boxplot(alpha= 0.5)+
-    geom_point(position = position_dodge(width = 0.75), alpha = 0.8, aes(color = treatment))+
-  xlab("decomposition day")+
-  ggtitle("")+
-    ylab(expression("log optical density (OD"[450~nm]*")"))+
-      scale_color_manual(values = c("#CC79A7", "#009E73")) +
-    scale_fill_manual(values = c("#CC79A7", "#009E73")) +
-      geom_hline(aes(yintercept = mean(trans.od), linetype = "Average"), color = alpha("red", 1), linetype = "dashed") +
-theme_bw()+
-  theme(
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 16),
-    legend.text = element_text(size = 16),
-    legend.title = element_text(size = 16),
-    strip.text = element_text(size = 16)
-  )
-
-#true home using transformed using mean and confidence intervals
-meta.mean.ci.plot<- merged.true_home_z.df %>%
-  na.omit() %>%
-  filter(group == "H") %>%
-  ggplot(aes(x = as.factor(decomp_day), y = trans.od, fill = treatment)) +
-  stat_summary(fun = mean, geom = "point", aes(color = treatment), position = position_dodge(width = 0.5), size = 3) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.2, aes(color = treatment), position = position_dodge(width = 0.5)) +
-  xlab("decomposition day") +
-  ggtitle("") +
-  ylab(expression("log optical density (OD"[450~nm]*")")) +
-  scale_color_manual(values = c("#CC79A7", "#009E73")) +
-  scale_fill_manual(values = c("#CC79A7", "#009E73")) +
-  theme_bw() +
-  theme(
-    axis.text = element_text(size = 18),
-    axis.title = element_text(size = 16),
-    legend.text = element_text(size = 16),
-    legend.title = element_text(size = 16),
-    strip.text = element_text(size = 16)
-  )
-
-ggsave("figures/meta.mean.ci.plot.pdf", meta.mean.ci.plot, width = 14, height = 7)
-
-#day 1
-compare.day1 <- merged.true_home_z.df %>%
-  filter(group == "H", decomp_day == "1")
-
-day1.lm<- lm(trans.od ~ treatment, data = compare.day1)
-plot(day1.lm)
-
-#day 3
-compare.day3 <- merged.true_home_z.df %>%
-  filter(group == "H", decomp_day == "3")
-
-day3.lm<- lm(trans.od ~ treatment, data = compare.day3)
-plot(day3.lm)
-
-#day 5
-compare.day5 <- merged.true_home_z.df %>%
-  filter(group == "H", decomp_day == "5")
-
-day5.lm<- lm(trans.od ~ treatment, data = compare.day5)
-plot(day5.lm)
-summary(day5.lm)
-
-day5.bigmod<- lm(trans.od ~ treatment, data = compare.day5)
-
-
-#day 7
-compare.day7 <- merged.true_home_z.df %>%
-  filter(group == "H", decomp_day == "7")
-
-day7.lm<- lm(trans.od ~ treatment, data = compare.day7)
-plot(day7.lm)
-summary(day7.lm)
-
-#day 11
-compare.day11 <- merged.true_home_z.df %>%
-  filter(group == "H", decomp_day == "11")
-
-day11.lm<- lm(trans.od ~ treatment, data = compare.day11)
-plot(day11.lm)
-summary(day11.lm)
-
-#day 17
-compare.day17 <- merged.true_home_z.df %>%
-  filter(group == "H", decomp_day == "17")
-
-day17.lm<- lm(trans.od ~ treatment, data = compare.day17)
-plot(day17.lm)
-summary(day17.lm)
-
-
-merged.true_home_z.df%>%
-  filter(group =="H")%>%
-  ggplot(aes(x= decomp_day, y= trans.od, color = treatment))+
-  geom_point(aes(y= trans.od))+
-  geom_smooth(method = "loess", formula = y~x)
-
-bigmod<- lm(trans.od ~ treatment + tree_num + site_num, subset = group == "H", data = merged.true_home_z.df)
-plot(bigmod)
-step(bigmod)
-vif(bigmod)
-summary(bigmod)
-
-smallmod<- lm(trans.od ~ treatment, subset = group == "H", data = merged.true_home_z.df)
-
-AIC(bigmod, smallmod)
-
-install.packages("pwr")
-library(pwr)
-pwr.t.test(d = 0.6, sig.level = 0.5, power = 0.8)
-pwr.t.test(d = 0.6, sig.level = 0.5, power = 0.8)
-
-
-
-lmermod<- lmer(formula = trans.od ~ treatment + (1 | tree_num) + (1|site_num), subset = group == "H", data = merged.true_home_z.df)
-plot(lmermod)
-AIC(bigmod, lmermod)
-lmeraov<- Anova(lmermod)
-
-TukeyHSD(aov(formula = trans.od ~ treatment + group + tree_num + treatment:group, 
-    data = merged.true_home_z.df))
-
-library(QuantPsyc)
-
-vif(bestmod, type = "predictor")
-
-```
 
 
 1/2/24 anova and boxplots
