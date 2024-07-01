@@ -545,7 +545,7 @@ ggsave("figures/meta.mean.noabaw_plot.png", meta.mean.noabaw_plot, width = 14, h
 
 This shows the "true" home and away scenario for the comparison between treatments.
 
-We can try z scoring the data rather than applying a log transformation. Spoiler: z scored OD is not normally distributed...we therefore won't use it
+We can try z scoring the data rather than applying a log transformation. Spoiler: z scored OD is not normally distributed...we therefore won't use it.
 ```{r}
 #all hok
 true_home.hok.zscore.df <- true_home.16.meta.df %>%
@@ -616,6 +616,7 @@ true_home.zscore.df %>%
         legend.title = element_text(size = 16))
 ```
 
+----- will likely delete below chunks----
 
 1/2/24 anova and boxplots
 ```{r}
@@ -984,6 +985,7 @@ meta_all.plot=merged.true_home_z.df%>%
 
 ```
 
+----- will likely delete below chunks----
 
 
 up to date figs 3/1/24 for metabolism assay: treatment comparisons across decomp day for home and total
@@ -1046,6 +1048,8 @@ t.test(trans.od ~ treatment, data = compare.day5)
 
 
 ```
+
+----- will likely delete below chunks----
 
 
 ```{r}
@@ -1257,6 +1261,8 @@ summary(total.meta)
 
 
 ```
+
+----- will likely delete below chunks----
 
 
 These are stats for the above figures. Each are separated in a similar fashion
@@ -1624,6 +1630,7 @@ ggsave("figures/meta_box.plot.pdf", meta_box.plot, width = 16, height = 18)
 
 ```
 
+----- will likely delete below chunks----
 
 old version??
 ```{r}
@@ -1842,310 +1849,6 @@ plot(all.meta_aov)
 
 ```
 
-
-Model exploration
-**A note on GAMs**
-The term "parametric" is often used to describe statistical models with a fixed, finite number of parameters. In contrast, "nonparametric" models are more flexible and can adapt to the complexity of the data without assuming a specific functional form.
-
-Generalized Additive Models (GAMs) can be considered semiparametric. They are a type of regression model that extends generalized linear models (GLMs) by allowing for more flexible, nonlinear relationships between predictors and the response variable. The "additive" part refers to the fact that the model is built by adding together multiple smooth functions, each representing the relationship between a predictor and the response.
-
-While GAMs introduce flexibility with the smooth functions, they still include parametric components, such as linear terms and parametric link functions. The parametric components provide a structured foundation, and the smooth functions capture additional complexity in the data.
-
-So, we are using GAMsm that combine parametric and nonparametric elements to provide a flexible framework for modeling complex relationships in the metabolism assay data.
-
-```{r}
-lmer1 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="1" & meta.450.df$hours=="24",]))
-summary(lmer1)
-
-lmer3 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="3" & meta.450.df$hours=="24",]))
-summary(lmer3)
-
-lmer5 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="5" & meta.450.df$hours=="24",]))
-summary(lmer5)
-
-lmer7 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="7" & meta.450.df$hours=="24",]))
-summary(lmer7)
-
-
-lmer11 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="11" & meta.450.df$hours=="24",]))
-summary(lmer11)
-plot(resid(lmer11))
-
-
-lmer17 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="17" & meta.450.df$hours=="24",]))
-aov(lmer17)
-
-
-
-
-lmer2 = lmer(od_corrected_b_n ~ treatment * group + (1 | deploy) + (1|site_num) + (1 |tree_id) + (1|tree_num),  data = na.omit(meta.450.df[meta.450.df$decomp_day=="5" & meta.450.df$hours=="24",]))
-summary(lmer2)
-
-AIC(lmer1, glmer2)
-
-lmer2 = lmer(z_score ~ treatment * group + (1 | decomp_day)  +  (1 | tree_id) + (1|tree_num), subset = hours == "24", data = na.omit(z_scored_df))
-
-AIC(lmer1, lmer2)
-
-lmer2 = lmer(od_corrected_b_n ~ pairing + (1 | decomp_day) + (1 | deploy) +  (1 | tree_id) + (1|tree_num), subset = hours == "24", data = meta.450.df)
-
-AIC(lmer1, lmer2)
-lmer3 = lmer(od_corrected_b_n ~ treatment * group + ( 1 + treatment + group | decomp_day)  + (1 | tree_id/tree_num) + (1|deploy/site_num), subset = hours == "24", data = meta.450.df)
-
-lmer4 = lmer(od_corrected_b_n ~ treatment * group + ( treatment * group || decomp_day)  + (1 | tree_id/tree_num) , subset = hours == "24", data = meta.450.df)
-
-
-gam1= gam(od_corrected_b_n ~ pairing + s(decomp_day, pairing, bs = "fs", k = 5)  +s(tree_num, k = 12, bs = 're') + s(tree_id, bs = 're') + 
-                   s(site_num, bs = 're') + s(deploy, bs = 're'),  method = "REML", 
-                 data = meta.450.df)
-summary(gam1)
-gam.check(gam1)
-#REML is generally preferred if you are primarily interested in estimating fixed effects and want better estimates of variance components. It's suitable for mixed-effects models.
-
-
-#testing GAMs
-
-gam1=gam(od_corrected_b_n ~ pairing + s(decomp_day ,k =6) + s(tree_id, tree_num, bs="re") + s(deploy, site_num, bs="re"), subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam2=gam(od_corrected_b_n ~ pairing + s(decomp_day, by= pairing, k =6) + s(tree_id,bs="re") + s(tree_num, bs="re") + s(deploy,bs="re") + s(site_num, bs="re"), subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam3=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k =6) + s(decomp_day, by= group, k =6)+ s(tree_id,bs="re") + s(tree_num, bs="re") + s(deploy,bs="re") + s(site_num, bs="re"), subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-#####
-gam4=gam(od_corrected_b_n ~ treatment + group + s(decomp_day, by= treatment, k =6) + s(decomp_day, by= group, k =6)+ s(tree_id,bs="re") + s(tree_num, bs="re") + s(deploy,bs="re") + s(site_num, bs="re"), subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-########
-
-gam5=gam(od_corrected_b_n ~ pairing + s(decomp_day, by= pairing, k=6)  + s(tree_num, bs="re") + s(deploy,bs="re") + s(site_num, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam6=gam(od_corrected_b_n ~ pairing + s(decomp_day, by= pairing, k=6)  + s(tree_num, tree_id, bs="re") +  s(site_num, deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-
-gam7=gam(od_corrected_b_n ~ treatment + group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k=6)+s(tree_num, bs="re") + s(deploy,bs="re") + s(site_num, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam8=gam(od_corrected_b_n ~ treatment + group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k=6)+s(tree_id, tree_num, bs="re")+ s(deploy, site_num, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-#########
-
-gam9=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k=6)+s(tree_num, bs="re") + s(deploy,bs="re") + s(site_num, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam10=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_id, tree_num, bs="re", k= 20) + s(deploy, site_num, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam11=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-gam12=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( site_num, tree_num, bs="re") + s(tree_id, bs="re") +  + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(meta.450.df))
-
-
-
-AIC( gam10, gam11, gam12)
-
-####### 2 canditate models
-####### first lets look at main effects and interaction of treatment and group
-
-# looks at interaction between main effects
-merged.true_home_z.df=merged.true_home_z.df %>%
-  mutate(treatment = factor(treatment, levels = c("AB", "P"))) %>%
-  mutate(group = factor(group, levels = c("AW", "H")))
-
-tw_gam_trt.grp=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, k=6),family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-plot(tw_gam_trt.grp)
-summary(tw_gam_trt.grp)
-anova.gam(tw_gam_trt.grp)
-
-tw_gam_trt.grp=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-tw_gam_trt.grp2=gam(od_corrected_b_n ~ treatment + group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re")  + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-tw_gam_trt.grp3=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-tw_gam_trt.grp4=gam(od_corrected_b_n ~ treatment*group + s(decomp_day, treatment, bs="fs", k =6)+ s(decomp_day,group,bs="fs", k =6)+ s(tree_id, bs="re") + s(site_num, deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-summary(tw_gam_trt.grp4)
-
-AIC(tw_gam_trt.grp, tw_gam_trt.grp2, tw_gam_trt.grp3,tw_gam_trt.grp4 )
-
-concurvity(tw_gam_trt.grp4)
-
-inv_gam_trt.grp=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = gaussian(link = "inverse"), method = "REML", data = na.omit(meta.450.df))
-
-log_gam_trt.grp=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = gaussian(link = "log"), method = "REML", data = na.omit(meta.450.df))
-
-tw_gam_trt.grp=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-z_tw_gam_trt.grp=gam(z_score ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-
-z_gam_trt.grp=gam(z_score ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = gaussian(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-
-gam_trt.grp=gam(od_corrected_b_n ~ treatment * group + s(decomp_day, by= treatment, k=6)  + s(decomp_day, by= group, k =6)+ s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = gaussian(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-summary(gam_trt.grp)
-gam.check(gam_trt.grp)
-concrvity(gam_trt.grp)
-anova.gam(gam_trt.grp)
-
-
-
-AIC(z_gam_trt.grp, gam_trt.grp)
-
-
-
-summary(tw_gam_trt.grp)
-gam.check(tw_gam_trt.grp)
-anova.gam(gam_trt.grp)
-
-#plot difference for P vs AB
-plot_difference(
-  gam_trt.grp,
-  series = decomp_day,
-  difference = list(treatment = c("P", "AB"))
-) + 
-  Fig.formatting 
-  #this is important to see where the differences in the smooths lie given that the term is significant (p = 0.002)
-
-
-#plot difference for P vs AB
-plot_difference(
-  gam_trt.grp,
-  series = decomp_day,
-  difference = list(group = c("H", "AW"))
-) + 
-  Fig.formatting 
-
-####### next we can look at paired main effects for pairwise comparison
-#looks at individual treatments
-gam_pair=gam(od_corrected_b_n ~ pairing + s(decomp_day, by= pairing, k=6) + s( tree_num, tree_id, bs="re") + s(site_num,bs="re") + s(deploy, bs="re"),  subset = hours == "24",family = tw(link = "identity"), method = "REML", data = na.omit(merged.true_home_z.df))
-summary(gam_pair)
-gam.check(gam_pair)
-
-AIC(gam_trt.grp, gam_pair, lmer1)
-BIC(gam_trt.grp, gam_pair)
-anova.gam(gam_pair)
-
-#### in our model (gam_pair), the reference level is set to P-AW, so we can inspect the differences between smooths relative to P-AW
-
-#plot difference for PAW and PH
-paw.vs.ph.diff=plot_difference(
-  gam_pair,
-  series = decomp_day,
-  difference = list(pairing = c("P-AW", "P-H"))
-)+
-   xlab("")+
-  ylab("")+
-      ggtitle("P-AW vs. P-H")+
-  Fig.formatting
-
-#plot difference for PAW and ABAW
-paw.vs.abaw.diff=plot_difference(
-  gam_pair,
-  series = decomp_day,
-  difference = list(pairing = c("P-AW", "AB-AW"))
-)+
-    xlab("")+
-    ggtitle("P-AW vs. AB-AW")+
-  Fig.formatting
-
-#plot difference for PAW and ABH
-paw.vs.abh.diff=plot_difference(
-  gam_pair,
-  series = decomp_day,
-  difference = list(pairing = c("P-AW", "AB-H"))
-)+
-  xlab("")+
-  ylab("")+
-  ggtitle("P-AW vs. AB-H")+
-  Fig.formatting
-
-#plot difference for PH and ABH
-ph.vs.abh.diff=plot_difference(
-  gam_pair,
-  series = decomp_day,
-  difference = list(pairing = c("P-H", "AB-H"))
-)+
-  xlab("")+
-  ylab("")+
-  ggtitle("P-H vs. AB-H")+
-  Fig.formatting
-
-#plot difference for PH and ABAW
-ph.vs.abaw.diff=plot_difference(
-  gam_pair,
-  series = decomp_day,
-  difference = list(pairing = c("P-H", "AB-AW"))
-)+
-  xlab("")+
-  ylab("")+
-  ggtitle("P-H vs. AB-AW")+
-  Fig.formatting
-
-#plot difference for ABAW and ABH
-abaw.vs.abh.diff=plot_difference(
-  gam_pair,
-  series = decomp_day,
-  difference = list(pairing = c("AB-AW", "AB-H"))
-)+
-  xlab("")+
-  ylab("")+
-  ggtitle("AB-AW vs. AB-H")+
-  Fig.formatting
-
-
-
-
-pair_diffs=plot_grid(
-  paw.vs.ph.diff,
-  paw.vs.abaw.diff,
-  paw.vs.abh.diff,
-  ph.vs.abh.diff,
-  ph.vs.abaw.diff,
-  abaw.vs.abh.diff,
-  rel_widths = c(1,1,1,1,1,1), nrow=2, ncol=3
-)
-
-pair_diffs
-
-ggsave("figures/pair_diffs.pdf", pair_diffs, width = 16, height = 8)
-
-
-
-```
-
-Model 1 (gam_trt.grp):
-
-Intercept: Represents the estimated mean response when all predictors are at their reference levels. In this case, it corresponds to the baseline condition of treatment AB and group AW.
-
-TreatmentP: Represents the estimated change in the mean response when moving from treatment AB to treatment P while holding group constant. The estimate is 0.10648 with a standard error of 0.04688. The t-value is 2.271, and the p-value is 0.0234.
-
-GroupH: Represents the estimated change in the mean response when moving from group AW to group H while holding treatment constant. The estimate is -0.05338 with a standard error of 0.04225. The t-value is -1.263, and the p-value is 0.2068.
-
-TreatmentP:GroupH Interaction: Represents the additional change in the mean response when both treatment is P and group is H compared to the reference level (treatment AB, group AW). The estimate is 0.03843 with a standard error of 0.06137. The t-value is 0.626, and the p-value is 0.5314.
-
-Interpretation:
-
-The interaction term, TreatmentP:GroupH, provides information about whether the effect of treatment P differs when the group is H compared to the reference level (group AW).
-
-A positive estimate (0.03843) suggests that, relative to the baseline condition (AB-AW), the mean response is higher when both treatment is P and group is H. However, this effect is not statistically significant since the p-value is 0.5314, which is greater than the commonly used significance level of 0.05.
-
-In simpler terms, the interaction suggests that there is no significant difference in the effect of treatment P between groups H and AW. It indicates that the effect of treatment P on the mean response is consistent across both groups.
-
-
-TreatmentP:GroupH Interaction Term:
-
-The estimate (0.03843) represents the additional change in the mean response when both treatment is P and group is H compared to the reference level (AB-AW).
-Interpretation:
-
-If we consider the levels of the categorical variables:
-
-Treatment: AB is the reference level.
-Group: AW is the reference level.
-The interaction term captures the additional change in the mean response when we move from the reference condition (AB-AW) to a specific condition, which is Treatment P and Group H.
-
-However, the interpretation does not directly provide information about the situation where Treatment is AB and Group is H. This is because the interaction term explicitly involves Treatment P.
-
-If you want to assess the difference in the mean response between Treatment AB and Treatment P specifically within Group H, you can do so by comparing the individual estimates for Treatment AB and Treatment P within Group H.
-
-Here's a simplified interpretation:
-
-AB-H vs. AB-AW: The effect of moving from AB to H within the same treatment (AB) is represented by the main effect of Group (GroupH). This is estimated to be -0.05338 (not statistically significant in this case).
-
-P-H vs. AB-AW: The interaction term (TreatmentP:GroupH) captures the additional change when both Treatment is P and Group is H compared to the reference level (AB-AW). The estimate is 0.03843 (not statistically significant in this case).
 
 
 
