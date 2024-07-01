@@ -40,7 +40,8 @@ knitr::opts_chunk$set(warning=FALSE, message=FALSE, fig.align='center')
 if (!require("pacman")) install.packages("pacman") # for rapid install if not in library
 
 # use pacman to load all the packages you are missing!
-pacman::p_load('knitr', 'lme4', 'tidyverse', 'magrittr', 'effects', 'plyr', 'dplyr', 'plotrix', 'car',"lmerTest", "gridExtra", "cowplot", "tools", "tidymv", "ggthemes", "ggpubr", "scales", "emmeans", "fBasics", "MASS")
+pacman::p_load('knitr', 'lme4', 'tidyverse', 'magrittr', 'effects', 'plyr', 'dplyr', 'plotrix', 'car',"lmerTest", "gridExtra", "cowplot", "tools", "tidymv", "ggthemes", "ggpubr", "scales", "emmeans", "fBasics", "MASS", "stringr",
+"purrr")
 
 Fig.formatting<-(theme_classic()) +
   theme(text=element_text(size=25),
@@ -1856,10 +1857,9 @@ plot(all.meta_aov)
 
 Load mass data 
 ```{r}
-library(stringr)
-library(purrr)
-mass.df=read.csv("/Users/cjspiegel/Desktop/GitHub/RAD Alder/data/leaf_mass.csv")
-###check for any white spaces clean up
+#load mass data
+mass.df=read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/leaf_mass.csv")
+#check for any white spaces and clean up
 columns_with_whitespace <- map_lgl(mass.df, ~ any(str_detect(.x, "^\\s+|\\s+$")))
 columns_with_whitespace
 
@@ -1871,21 +1871,69 @@ mass.df= mass.df%>%
 mass.df <- mass.df %>%
   mutate(perc.mass_loss = ((initial_mass - final_correct) / initial_mass)*100)
 
-# Calculate the constant C, adding 1 for safety
-C <- abs(min(mass.df$perc.mass_loss)) + 1  
+#check distribution/normality
+mass.df%>%
+  pull(perc.mass_loss)%>%
+  hist()
 
+mass.df%>%
+  pull(perc.mass_loss)%>%
+  normalTest(method = "da")
 
-#create arcsine trans column with perc.mass_loss + constant 
+#look at range of mass loss
+mass.df%>%
+  pull(perc.mass_loss)%>%
+  range()
+
+#even with the mass correction there are negative values, so we can shift the range of the data while maintaining the overall distribution using a constant 
+c <- abs(min(mass.df$perc.mass_loss)) + 1  
+#replace with shifted values
 mass.df <- mass.df %>%
-  mutate(perc.mass_loss = perc.mass_loss + C) %>%
-  mutate(prop.mass_loss = perc.mass_loss/100) %>%
-mutate(arcsine_trans = asin(sqrt(prop.mass_loss)))
+  mutate(perc.mass_loss = perc.mass_loss + c)
 
+#apply transformation
+mass.df%>%
+  mutate(mass_trans = log(perc.mass_loss))
 
-hist(mass.df[mass.df$treatment == "P" & mass.df$hfa == "H",]$perc.mass_loss)
-hist(mass.df[mass.df$treatment == "P" & mass.df$hfa == "A",]$perc.mass_loss)
-hist(mass.df[mass.df$treatment == "AB" & mass.df$hfa == "H",]$perc.mass_loss)
-hist(mass.df[mass.df$treatment == "P" & mass.df$hfa == "A",]$perc.mass_loss)
+#look at range and normality again
+mass.df%>%
+  pull(perc.mass_loss)%>%
+  normalTest(method = "da")
+
+#look at range of mass loss
+mass.df%>%
+  pull(perc.mass_loss)%>%
+  range()
+
+#apply logit and arcsine transformation
+mass.df<- mass.df%>%
+  mutate(prop.mass_loss = perc.mass_loss / 100)%>%
+  mutate(logit_trans = log(prop.mass_loss / (1 - prop.mass_loss)))%>%
+  mutate(arc_trans = asin(sqrt(prop.mass_loss)))
+
+# Find the optimal lambda for Box-Cox transformation
+# Using a simple model with an intercept to find the lambda
+boxcox_result <- boxcox(lm(prop.mass_loss ~ 1, data = mass.df))
+lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+
+# Apply the Box-Cox transformation
+mass.df <- mass.df %>%
+  group_by(treatment, tree_id, deploy, site_num, tree_num, hfa)%>%
+  mutate(box_trans = ifelse(lambda == 0, log(prop.mass_loss), (prop.mass_loss^lambda - 1) / lambda))
+
+#check normality
+mass.df%>%
+  pull(box_trans)%>%
+  normalTest(method = "da")
+
+mass.df%>%
+  filter(treatment == "P" & hfa == "H")%>%
+  pull(box_trans)%>%
+  normalTest(method = "da")
+
+#back-transformation
+(lambda * box_trans + 1)^(1/lambda)
+
 
 #subset P treatment only for "true" HFA  
 mass.present.df=mass.df %>%
@@ -1895,6 +1943,17 @@ mass.present.df=mass.df %>%
 mass.absent.df=mass.df %>%
   filter(treatment == "AB")
 
+
+```
+
+quick data visualization
+```{r}
+mass.df%>%
+  filter(hfa == "H")%>%
+  ggplot(aes(treatment, box_trans, color = treatment))+
+  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  scale_color_viridis_d()
 
 ```
 
@@ -2914,6 +2973,40 @@ Armla and Armlb; Brlma, Brmlb: These are the relative mass loss values for speci
 100 is subtracted from the value obtained. This is done to measure the percentage difference in mass loss at the home site (site dominated by the species) compared to the away site (site dominated by the other species). If the value is positive, it indicates that the litter decomposes faster at its home site, showing a home-field advantage. If the value is negative, it suggests that decomposition is slower at the home site, indicating a home-field disadvantage.
 
 The equation calculates the Home-Field Advantage Index (HFAI) by comparing the relative mass loss of litter from two species at their home and away sites. The result is expressed as a percentage, indicating how much faster (or slower) the decomposition occurs at the home site compared to the away site.
+
+create df subsets
+```{r}
+#HOK 1 subset
+mass.hok1.df <- data.frame(mass.df[mass.df$deploy == "HOK" & mass.df$site_num == "1", ])
+
+#HOK 1 P subset
+mass.hok1.present.df = data.frame(mass.hok1.df[mass.hok1.df$deploy == "HOK" & mass.hok1.df$treatment == "P" & mass.hok1.df$site_num == "1", ])
+#HOK 1 AB subet
+mass.hok1.absent.df = data.frame(mass.hok1.df[mass.hok1.df$deploy == "HOK" & mass.hok1.df$treatment == "AB" & mass.hok1.df$site_num == "1", ])
+
+#HOK 2 subset
+mass.hok2.df <- data.frame(mass.df[mass.df$deploy == "HOK" & mass.df$site_num == "2", ])
+#HOK 2 P subset
+mass.hok2.present.df =data.frame(mass.hok2.df[mass.hok2.df$deploy == "HOK" & mass.hok2.df$treatment == "P" & mass.hok2.df$site_num == "2", ])
+#HOK 2 AB subset
+mass.hok2.absent.df =data.frame(mass.hok2.df[mass.hok2.df$deploy == "HOK" & mass.hok2.df$treatment == "AB" & mass.hok2.df$site_num == "2", ])
+
+#SEK 1 subset
+mass.sek1.df <- data.frame(mass.df[mass.df$deploy == "SEK" & mass.df$site_num == "1", ])
+#SEK 1 P subset
+mass.sek1.present.df = data.frame(mass.sek1.df[mass.sek1.df$deploy == "SEK" & mass.sek1.df$treatment == "P" & mass.sek1.df$site_num == "1", ])
+#SEK 1 AB subset
+mass.sek1.absent.df = data.frame(mass.sek1.df[mass.sek1.df$deploy == "SEK" & mass.sek1.df$treatment == "AB" & mass.sek1.df$site_num == "1", ])
+
+
+#SEK 2 subset
+mass.sek2.df <- data.frame(mass.df[mass.df$deploy == "SEK" & mass.df$site_num == "2", ])
+#SEK 2 P subset
+mass.sek2.present.df = data.frame(mass.sek2.df[mass.sek2.df$deploy == "SEK" & mass.sek2.df$treatment == "P" & mass.sek2.df$site_num == "2", ])
+#SEK 2 AB subset
+mass.sek2.absent.df = data.frame(mass.sek2.df[mass.sek2.df$deploy == "SEK" & mass.sek2.df$treatment == "AB" & mass.sek2.df$site_num == "2", ])
+
+```
 
 
 NEW: use this! This is a now a proper test dataframe with for loop!
@@ -4158,7 +4251,6 @@ ggsave("figures/hfai.allsites.plot.pdf", hfai.allsites.plot, width = 8, height =
 ```
 
 
-
 P only HFAI analysis
 ```{r}
 ####################  P ONLY ###################
@@ -4335,6 +4427,7 @@ range(positive_values[positive_values$treatment == "P",]$values)
 
 ```
 
+
 12/14/23: updated HFAI above, this is the final fig
 ```{r}
 #all sites
@@ -4387,7 +4480,7 @@ hfai.allsites.df %>%
 
 
 
-hfai.allsites.plot<-hfai.allsites.df %>%
+hfai.allsites.df %>%
   filter(!is.na(values)) %>%
   filter(values<180) %>%
   ggplot(aes(x = treatment, y = values, color = treatment, fill = treatment)) +
@@ -4402,16 +4495,28 @@ hfai.allsites.plot<-hfai.allsites.df %>%
   theme(legend.position = "right") +
   geom_hline(yintercept = 0, linetype = "dashed", color = "red")+ theme(plot.margin = unit(c(2, 2, 2, 2), "lines"))
 
-
-
-
-
-
-
-
 hfai.allsites.plot
 
+
+hfai.allsites.plot<- hfai.allsites.df %>%
+  filter(!is.na(values)) %>%
+  filter(values<180) %>%
+  ggplot(aes(x = treatment, y = values, color = treatment, shape = treatment)) +
+  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+    scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+geom_hline(aes(yintercept = mean(values)), color = "red3", linetype = "dashed") +
+   labs(x = "treatment", y = "magnitude of decomposition (%)") +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
 ggsave("figures/hfai.allsites.plot.pdf", hfai.allsites.plot, width = 8, height = 6)
+
 
 
 
