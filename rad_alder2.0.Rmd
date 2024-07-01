@@ -5061,22 +5061,76 @@ adonis2(pos_dist_metabolites_ra ~ PCA_whole_ra_scores_pos$Attribute_TreeID, PCA_
 isotopes
 ```{r}
 #load data
-isotope.df=read.csv("/Users/Cody1/Desktop/GitHub/RAD Alder/data/isotopes.csv") 
-isotope.df$tree_id <- as.factor(isotope.df$tree_id)
-isotope.df$treatment <- as.factor(isotope.df$treatment)
+isotope.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/isotopes.csv") 
 
-#add columns
-isotope.df=isotope.df%>%
-  dplyr::group_by(treatment, tree_id, site_num, tree_num)%>%
-    dplyr::mutate(total_C.g=total_C/10^6)%>%
-    dplyr::mutate(total_N.g=total_N/10^6)%>%
-    dplyr::mutate(c_n = total_C.g / total_N.g)%>%
-   dplyr:: mutate(weight.g = weight/1000)%>%
-   dplyr:: mutate(perc.C= (total_C.g/weight.g)*100)%>%
-    dplyr::mutate(perc.N= (total_N.g/weight.g)*100)
-View(isotope.df)
+#add new columns
+isotope.df<- isotope.df%>%
+  group_by(treatment, tree_id, site_num, tree_num)%>%
+   mutate(total_c.g = total_C / 10^6,
+         total_n.g = total_N / 10^6,
+         c_n = total_c.g / total_n.g,
+         weight.g = weight / 1000,
+         perc.c = (total_c.g / weight.g) * 100,
+         perc.n = (total_n.g / weight.g) * 100)
+
+#assign class
+isotope.df$treatment<- as.factor(isotope.df$treatment)
+isotope.df$tree_id<- as.factor(isotope.df$tree_id)
+isotope.df$site_num<- as.factor(isotope.df$site_num)
+isotope.df$tree_num<- as.factor(isotope.df$tree_num)
+```
+
+figures
+```{r}
+#### C:N ratio
+#explore the data
+isotope.df%>%
+  filter(treatment == "AB")%>%
+  pull(c_n)%>%
+  normalTest(method = "da")
+
+isotope.df%>%
+  filter(treatment == "P")%>%
+  pull(perc.n)%>%
+  normalTest(method = "da")
+
+#C:N
+isotope.df%>%
+  ggplot(aes(treatment, c_n, color = treatment, shape = treatment))+
+  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+    scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+geom_hline(aes(yintercept = mean(c_n)), color = "red3", linetype = "dashed") +
+   labs(x = "treatment", y = "C:N") +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+#percent N
+isotope.df%>%
+  ggplot(aes(treatment, perc.n, color = treatment, shape = treatment))+
+  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+    scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+geom_hline(aes(yintercept = mean(perc.n)), color = "red3", linetype = "dashed") +
+   labs(x = "treatment", y = "percent N") +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
 
 
+```
+
+
+```{r}
 #C:N ratio
 c_n.aov=aov(c_n ~ treatment, data =isotope.df)
 c_n.tHSD=TukeyHSD(c_n.aov, ordered = F, conf.level = 0.95)
