@@ -16,7 +16,7 @@ output:
 ---
 
 ### Project overview
-Project ‘RAD’ Alder explores the role of resident leaf-associated microbes presence (P) and absence (i.e., (AB) gamma irradiated) leaf packs deployed at “home” (H) and “away” (AW) rivers in leaf litter decomposition. We utilized a reciprocal transplant experiment between two rivers, the Hoko (HOK) and the Sekiu (SEK), on the WA state Olympic Peninsula. This 2x2 factorial design yielded four treatments: 1) P-H, 2) P-AW, 3) AB-H, and 4) AB-AW and we asked the following questions:
+Project ‘RAD’ Alder explores the role of resident leaf-associated microbes presence (P) and absence ((AB), i.e., gamma irradiated) leaf packs deployed at “home” (H) and “away” (AW) rivers in leaf litter decomposition. We utilized a reciprocal transplant experiment between two rivers, the Hoko (HOK) and the Sekiu (SEK), on the WA state Olympic Peninsula. This 2x2 factorial design yielded four treatments: 1) P-H, 2) P-AW, 3) AB-H, and 4) AB-AW and we asked the following questions:
 
 i) How does dispersal from the regional species pool (i.e., source communities) influence community composition on the leaf packs?
 ii) How does microbial community composition (alpha and beta diversity) and function differ between the leaf packs, as well as change over the course of decomposition?
@@ -373,8 +373,8 @@ anova(meta_home_inter_decompmod,meta_home_add_decompmod )
 AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
 
 #check out mod
-plot(resid(meta_home_decompmod))
-hist(resid(meta_home_decompmod))
+plot(resid(meta_home_inter_decompmod))
+hist(resid(meta_home_inter_decompmod))
 #summary
 summary(meta_home_inter_decompmod)
 #backtransformed
@@ -467,7 +467,7 @@ ggsave("figures/meta.biginteract_plot.png", meta.biginteract_plot, width = 14, h
 
 
 ###at home only——present vs absent plot
-meta.homeonly_plot %>%
+meta.homeonly_plot<- true_home.16.meta.df%>%
   filter(group == "H") %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = treatment, shape = treatment)) +
   stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
@@ -475,7 +475,7 @@ meta.homeonly_plot %>%
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
   geom_hline(aes(yintercept = mean(log_od)), color = "red3", linetype = "dashed") +
-  labs(x = "Decomposition day", y = expression("log(OD"[450 * nm]*")")) +
+  labs(x = "decomposition day", y = expression("log(OD"[450 * nm]*")")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
   theme_bw() +
   theme(axis.text = element_text(size = 18),
@@ -615,8 +615,6 @@ true_home.zscore.df %>%
         legend.text = element_text(size = 16),
         legend.title = element_text(size = 16))
 ```
-
-
 
 
 1/2/24 anova and boxplots
