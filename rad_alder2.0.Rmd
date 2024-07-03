@@ -3994,6 +3994,9 @@ View(neg_data)
 neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/RAD_prelim_metadata_negative_rstudio.csv") %>% arrange(Sample)
 all(neg_data$Sample == neg_metadata$Sample)
 
+#merge
+neg_merged.df<- merge(neg_data,neg_metadata, by = "Sample")
+
 ### load positive mode
 pos_data <- read_csv("/Users/Cody1/Desktop/Projects/RAD Alder/LC-MS/RAD_positive_mode_11_3_2023_quant_copy.csv") %>% arrange(Sample)
 View(pos_data)
@@ -4062,66 +4065,185 @@ range(df_long$intensity)
 ```
 
 
-Another way to analyze
+Day 0 alder chemistry
 ```{r}
-#using random forest data from metaboanalyst for sig MS ID
-tree_rand_frst.df <- read_csv("/Users/Cody1/Desktop/Projects/RAD Alder/LC-MS/random_forest_tree.csv")
-type_rand_frst.df <- read_csv("/Users/Cody1/Desktop/Projects/RAD Alder/LC-MS/random_forest_type.csv")
+### load negative mode
+neg_data <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/NEG_day0_trans_quant.csv") %>% arrange(Sample)
+neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/RAD_prelim_metadata_negative_rstudio.csv") %>% arrange(Sample)
+all(neg_data$Sample == neg_metadata$Sample)
 
-View(rand_frst.df)
+#make long
+neg_long.df<- pivot_longer(neg_data, cols = starts_with("MS_"), 
+                        names_to = "ms", values_to = "values")
 
-#filter top metabolites
-tree_rand_frst.df%>%
-  filter(MeanDecreaseAccuracy > 0.0009)%>%
-  n_distinct()
-#top 50 metabolites
+#Normalize by median within each ms group
+neg_long.df <- neg_long.df %>%
+  group_by(ms) %>%
+  mutate(values = values / median(values, na.rm = TRUE))
 
-#filter 
-type_rand_frst.df%>%
-  filter(MeanDecreaseAccuracy > 0.0027)%>%
-  n_distinct()
-#top 40
+# Step 3: Log transformation (base 10)
+neg_long.df <- neg_long.df %>%
+  mutate(values = log10(values + 1))  # Adding 1 to handle zero values before log transformation
 
-#create new subset df
-fltr.tree_rand_frst.df=tree_rand_frst.df%>%
-  filter(MeanDecreaseAccuracy > 0.0009)
+# Step 4: Mean-centered scaling by standard deviation within each ms group
+neg_long.df <- neg_long.df %>%
+  group_by(ms) %>%
+  mutate(values = (values - mean(values, na.rm = TRUE)) / sd(values, na.rm = TRUE))
 
-#create new subset df
-fltr.type_rand_frst.df=type_rand_frst.df%>%
-  filter(MeanDecreaseAccuracy > 0.0027)
+# Step 5: Merge peak data and metadata
+df_final <- merge(neg_long.df, neg_metadata, by = "Sample")
 
-#list them
-list(fltr.tree_rand_frst.df$Feature_Index)
+# Step 6: Filter for MS of interest
+ms_of_interest <- c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", 
+                    "MS_834", "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", 
+                    "MS_1300", "MS_1422", "MS_1431", "MS_1442", "MS_1456")
+df_filtered <- df_final %>% filter(ms %in% ms_of_interest)
 
-list(fltr.type_rand_frst.df$Feature_Index)
+# Example mapping table (replace with your actual data)
+ms_names_mapping <- data.frame(
+  MS = c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", "MS_834", 
+         "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", "MS_1300", "MS_1422", 
+         "MS_1431", "MS_1442", "MS_1456"),
+  names = c("Shikimic acids and derivatives", "Shikimic acids and derivatives", "Shikimic acids and derivatives", 
+            "Shikimic acids and derivatives", "Shikimic acids and derivatives", "Shikimic acids and derivatives", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", "Gallotannins", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Gallotannins", "Gallotannins")
+)
 
+# Step 7: Merge with the mapping table to add the names column
+df_filtered <- merge(df_filtered, ms_names_mapping, by.x = "ms", by.y = "MS")
+View(df_filtered)
 
-#merge peak data and metadata
-df <- merge(neg_data_ra, neg_metadata, by = "Sample")
-View(neg_metadata)
-
-# keep top 50 
-tree.columns_to_keep <- c("Sample", "Attribute_type", "Attribute_TreeID", "Attribute_Sitenum", "Attribute_Treenum",
-                      "MS_3998", "MS_3995", "MS_2909" ,"MS_478"  ,"MS_2911" ,"MS_2716" ,"MS_2720", "MS_2913" ,"MS_405" , "MS_2915" ,"MS_2905",
-"MS_477"  ,"MS_2918", "MS_2917" ,"MS_2907", "MS_2916", "MS_2735", "MS_2887" ,"MS_678" , "MS_2910", "MS_2724" ,"MS_2728",
-"MS_2726", "MS_2904" ,"MS_3808", "MS_1286", "MS_2886", "MS_2908" ,"MS_1050" ,"MS_3029", "MS_3025" ,"MS_2733" ,"MS_2884",
-"MS_636" , "MS_2729" ,"MS_3039", "MS_3024", "MS_2715", "MS_2906" ,"MS_3034" ,"MS_679" , "MS_2714" ,"MS_2892", "MS_3027",
-"MS_3650", "MS_2721" ,"MS_3953", "MS_2736", "MS_2717", "MS_2450")
-
-# keep top 54 
-type.columns_to_keep <- c("Sample", "Attribute_type", "Attribute_TreeID", "Attribute_Sitenum", "Attribute_Treenum",
-                      "MS_1702", "MS_1167", "MS_1693", "MS_3914", "MS_3130", "MS_1700", "MS_1000" ,"MS_1701", "MS_1691", "MS_1672", "MS_1709",
-"MS_1372", "MS_3915" ,"MS_1166", "MS_1215" ,"MS_1350", "MS_3774" ,"MS_1681" ,"MS_1313", "MS_1689", "MS_1315" ,"MS_4098",
-"MS_1676", "MS_1007" ,"MS_1680" ,"MS_3778" ,"MS_3777" ,"MS_1699" ,"MS_1161" ,"MS_1004" ,"MS_1171", "MS_3918" ,"MS_1534",
-"MS_1172", "MS_1393", "MS_1151" ,"MS_1687", "MS_1373" ,"MS_1399" ,"MS_1157")
+# keep MS of interest
+columns_to_keep <- c("Sample", "ATTRIBUTE_type", "ATTRIBUTE_TreeID", "ATTRIBUTE_Sitenum", "ATTRIBUTE_Treenum",
+                          "MS_363",
+                          "MS_371",
+                          "MS_372",
+                          "MS_369",
+                          "MS_475",
+                          "MS_646",
+                          "MS_752",
+                          "MS_754",
+                          "MS_823",
+                          "MS_834",
+                          "MS_895",
+                          "MS_929",
+                          "MS_1141",
+                          "MS_1203",
+                          "MS_1205",
+                          "MS_1240",
+                          "MS_1297",
+                          "MS_1300",
+                          "MS_1422",
+                          "MS_1431",
+                          "MS_1442",
+                          "MS_1456"
+                          )
 
 # Remove columns not in the specified list
-tree.filtered_df <- df[, c(tree.columns_to_keep)]
-head(filtered_df)
+filtered_df <- neg_data[, c(columns_to_keep)]
+# Example mapping table (replace with your actual data)
+ms_names_mapping <- data.frame(
+  MS = c("MS_363",
+                          "MS_371",
+                          "MS_372",
+                          "MS_369",
+                          "MS_475",
+                          "MS_646",
+                          "MS_752",
+                          "MS_754",
+                          "MS_823",
+                          "MS_834",
+                          "MS_895",
+                          "MS_929",
+                          "MS_1141",
+                          "MS_1203",
+                          "MS_1205",
+                          "MS_1240",
+                          "MS_1297",
+                          "MS_1300",
+                          "MS_1422",
+                          "MS_1431",
+                          "MS_1442",
+                          "MS_1456"),
+  names = c("Shikimic acids and derivatives", 
+            "Shikimic acids and derivatives", 
+            "Shikimic acids and derivatives", 
+            "Shikimic acids and derivatives", 
+            
+            "Shikimic acids and derivatives", 
+            "Shikimic acids and derivatives", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Gallotannins", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", 
+            "Gallotannins", 
+            "Gallotannins")
+)
 
-type.filtered_df=df[, c(type.columns_to_keep)]
-head(type.filtered_df)
+# Merge with filtered_df
+filtered_df <- merge(filtered_df, ms_names_mapping)
 
+#make longer df
+df_long <- pivot_longer(filtered_df, cols = starts_with("MS_"), 
+                        names_to = "ms", values_to = "values")
+View(df_long)
+#plot
+day0_chem.plot<- df_filtered %>%
+  ggplot(aes(x = ATTRIBUTE_type, y = values, color = ATTRIBUTE_type, shape = ATTRIBUTE_type)) +
+stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
+  facet_wrap(.~names)+
+  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+    scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+
+day0_chem.plot
+
+ggsave("figures/day0_chem.plot.png", day0_chem.plot, width = 14, height = 7)
+
+
+# Subset the data for "Linear diarylheptanoids"
+compound <- "Linear diarylheptanoids"
+df_sub <- df_filtered[df_filtered$names == compound, ]
+# Perform t-test
+t.test(values ~ ATTRIBUTE_type, data = df_sub)
+
+# Subset the data for "Gallotannins"
+compound <- "Gallotannins"
+df_sub <- df_filtered[df_filtered$names == compound, ]
+# Perform t-test
+t.test(values ~ ATTRIBUTE_type, data = df_sub)
+
+# Subset the data for "Shikimic acids"
+compound <- "Shikimic acids and derivatives"
+df_sub <- df_filtered[df_filtered$names == compound, ]
+# Perform t-test
+t.test(values ~ ATTRIBUTE_type, data = df_sub)
+
+
+```
+
+
+```{r}
 # Extract the numeric columns for PCA
 tree.numeric_cols <- tree.filtered_df[, 6:ncol(tree.filtered_df)]
 
