@@ -4538,23 +4538,32 @@ isotope.df$tree_num<- as.factor(isotope.df$tree_num)
 
 figures
 ```{r}
-#### C:N ratio
+#### isotope analysis
 #explore the data
+#checking normality
 isotope.df%>%
   filter(treatment == "AB")%>%
   pull(c_n)%>%
   normalTest(method = "da")
-
+#checking normality
 isotope.df%>%
   filter(treatment == "P")%>%
   pull(perc.n)%>%
   normalTest(method = "da")
+#check means
+isotope.df%>%
+  filter(treatment == "P")%>%
+  summarise(mean(c_n))
 
-#C:N
+isotope.df%>%
+  filter(treatment == "AB")%>%
+  summarise(mean(c_n))
+
+####C:N stats and plot
 c_n.plot<- isotope.df%>%
   ggplot(aes(treatment, c_n, color = treatment, shape = treatment))+
-  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
     scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
 geom_hline(aes(yintercept = mean(c_n)), color = "red3", linetype = "dashed") +
@@ -4565,14 +4574,51 @@ geom_hline(aes(yintercept = mean(c_n)), color = "red3", linetype = "dashed") +
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
+c_n.plot
 
 ggsave("figures/c_n.plot.png", c_n.plot, width = 14, height = 7)
 
-#percent N
+#c:n stats
+c_n.bigmod<- lmer(c_n ~ treatment + (1 | site_num:tree_num) + (1 | tree_id), data = isotope.df)
+c_n.mod2<- lmer(c_n ~ treatment + (1 | site_num:tree_num), data = isotope.df)
+c_n.mod3<- lmer(c_n ~ treatment + (1 | site_num) + (1 | tree_num) + (1 | tree_id), data = isotope.df)
+c_n.mod4<- lmer(c_n ~ treatment + (1 | tree_id), data = isotope.df)
+c_n.mod5<- lmer(c_n ~ treatment + (1 | tree_num) + (1 | tree_id), data = isotope.df)
+c_n.mod6<- lmer(c_n ~ treatment + (1 | site_num) + (1 | tree_id), data = isotope.df)
+c_n.mod7<- lmer(c_n ~ treatment + (1 | site_num) + (1 | tree_num), data = isotope.df)
+#AIC
+AIC(c_n.bigmod,c_n.mod2,c_n.mod3,c_n.mod4,c_n.mod5,c_n.mod6,c_n.mod7 )
+#check mod
+c_n.mod2
+plot(resid(c_n.mod2))
+hist(resid(c_n.mod2))
+#double checking
+normalTest(resid(c_n.mod), method = "da")
+#summary
+summary(c_n.mod2)
+anova(c_n.mod2)
+```
+
+
+```{r}
+#### isotope analysis
+#explore the data
+#checking normality
 isotope.df%>%
+  filter(treatment == "AB")%>%
+  pull(perc.n)%>%
+  normalTest(method = "da")
+#checking normality
+isotope.df%>%
+  filter(treatment == "P")%>%
+  pull(perc.n)%>%
+  normalTest(method = "da")
+
+####percent N stats and plot
+perc_n.plot<- isotope.df%>%
   ggplot(aes(treatment, perc.n, color = treatment, shape = treatment))+
-  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
     scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
 geom_hline(aes(yintercept = mean(perc.n)), color = "red3", linetype = "dashed") +
@@ -4584,6 +4630,29 @@ geom_hline(aes(yintercept = mean(perc.n)), color = "red3", linetype = "dashed") 
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
+
+ggsave("figures/perc_n.plot.png", perc_n.plot, width = 14, height = 7)
+
+#perc n stats
+perc_n.bigmod<- lmer(perc.n ~ treatment + (1 | site_num:tree_num) + (1 | tree_id), data = isotope.df)
+perc_n.mod2<- lmer(perc.n ~ treatment + (1 | site_num:tree_num), data = isotope.df)
+perc_n.mod3<- lmer(perc.n ~ treatment + (1 | site_num) + (1 | tree_num) + (1 | tree_id), data = isotope.df)
+perc_n.mod4<- lmer(perc.n ~ treatment + (1 | tree_id), data = isotope.df)
+perc_n.mod5<- lmer(perc.n ~ treatment + (1 | tree_num) + (1 | tree_id), data = isotope.df)
+perc_n.mod6<- lmer(perc.n ~ treatment + (1 | site_num) + (1 | tree_id), data = isotope.df)
+perc_n.mod7<- lmer(perc.n ~ treatment + (1 | site_num) + (1 | tree_num), data = isotope.df)
+#AIC
+AIC(c_n.bigmod,c_n.mod2,c_n.mod3,c_n.mod4,c_n.mod5,c_n.mod6,c_n.mod7 )
+#check mod
+perc_n.mod2
+plot(resid(perc_n.mod2))
+hist(resid(perc_n.mod2))
+#double checking
+normalTest(resid(perc_n.mod2), method = "da")
+#summary
+summary(perc_n.mod2)
+anova(perc_n.mod2)
+
 
 ```
 
@@ -4807,3 +4876,9 @@ result_df <- merged_df %>%
   select(row.ID, compound_name, compound_class, starts_with("sample"))
 
 print(result_df)
+
+
+
+
+```
+
