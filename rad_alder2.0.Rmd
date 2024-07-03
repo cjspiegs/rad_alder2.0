@@ -313,16 +313,13 @@ decomp_pairs_df
 
 paired t test
 ```{r}
-head(true_home.16.meta.df)
-
 true_home.16.meta.df %>%
   filter(treatment == "P", deploy == "HOK", site_num == 2, tree_num == 5, group %in% c("H", "AW"), decomp_day == "3") %>%
   pivot_wider(names_from = group, values_from = log_od, names_prefix = "log_od_") %>%
-  your_dataframe %>%
   filter(!is.na(log_od_H) & !is.na(log_od_AW)) %>%
   mutate(delta = log_od_H - log_od_AW)
 
-  mutate(delta = log_od_H - log_od_AW)
+
 
 # Calculate the difference (delta) between H and AW log_od values
 
