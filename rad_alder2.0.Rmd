@@ -4079,20 +4079,40 @@ neg_long.df<- pivot_longer(neg_data, cols = starts_with("MS_"),
 #Normalize by median within each ms group
 neg_long.df <- neg_long.df %>%
   group_by(ms) %>%
-  mutate(values = values / median(values, na.rm = TRUE))
+  mutate(trans_values = values / median(values, na.rm = TRUE))
 
 # Step 3: Log transformation (base 10)
 neg_long.df <- neg_long.df %>%
-  mutate(values = log10(values + 1))  # Adding 1 to handle zero values before log transformation
+  mutate(trans_values = log10(trans_values + 1))  # Adding 1 to handle zero values before log transformation
 
 # Step 4: Mean-centered scaling by standard deviation within each ms group
 neg_long.df <- neg_long.df %>%
   group_by(ms) %>%
-  mutate(values = (values - mean(values, na.rm = TRUE)) / sd(values, na.rm = TRUE))
+  mutate(trans_values = (trans_values - mean(trans_values, na.rm = TRUE)) / sd(trans_values, na.rm = TRUE))
 
 # Step 5: Merge peak data and metadata
 df_final <- merge(neg_long.df, neg_metadata, by = "Sample")
 
+##plot to see normalization worked
+#for sample
+df_final%>%
+ggplot(aes(y = trans_values, x = Sample)) +
+  geom_boxplot(fill = "green") +
+  labs(x = "Transformed Values", y = "Sample") +  
+  theme_minimal()+
+  coord_flip()
+
+#desnity plot
+df_final %>%
+  ggplot(aes(x = trans_values)) +
+  geom_density(fill = "skyblue", color = "blue", alpha = 0.5) +  # Customize fill and color
+  labs(x = "Values", y = "Density") +  # Labels for axes
+  theme_minimal()  # Optional: Use a minimal theme
+
+```
+
+Filter gallotannins, diarylheptanoids, and shikimic acids
+```{r}
 # Step 6: Filter for MS of interest
 ms_of_interest <- c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", 
                     "MS_834", "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", 
@@ -4114,7 +4134,6 @@ ms_names_mapping <- data.frame(
 
 # Step 7: Merge with the mapping table to add the names column
 df_filtered <- merge(df_filtered, ms_names_mapping, by.x = "ms", by.y = "MS")
-View(df_filtered)
 
 # keep MS of interest
 columns_to_keep <- c("Sample", "ATTRIBUTE_type", "ATTRIBUTE_TreeID", "ATTRIBUTE_Sitenum", "ATTRIBUTE_Treenum",
@@ -4199,22 +4218,28 @@ filtered_df <- merge(filtered_df, ms_names_mapping)
 #make longer df
 df_long <- pivot_longer(filtered_df, cols = starts_with("MS_"), 
                         names_to = "ms", values_to = "values")
-View(df_long)
+
+```
+
+
+```{r}
 #plot
 day0_chem.plot<- df_filtered %>%
-  ggplot(aes(x = ATTRIBUTE_type, y = values, color = ATTRIBUTE_type, shape = ATTRIBUTE_type)) +
+  ggplot(aes(x = ATTRIBUTE_type, y = trans_values, color = ATTRIBUTE_type, shape = ATTRIBUTE_type)) +
 stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
   facet_wrap(.~names)+
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
     scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(y = "Normalized concentration", x = "Treatment", color = "Treatment", shape = "Treatment")+
+  geom_hline(yintercept  = 0, color = "red", linetype = "dashed", alpha = 0.5)+
   guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
   theme_bw() +
   theme(axis.text = element_text(size = 18),
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18))
-
+        legend.title = element_text(size = 18),
+        strip.text = element_text(size= 18))
 
 day0_chem.plot
 
@@ -4239,8 +4264,38 @@ df_sub <- df_filtered[df_filtered$names == compound, ]
 # Perform t-test
 t.test(values ~ ATTRIBUTE_type, data = df_sub)
 
+mean(df_filtered[df_filtered$ATTRIBUTE_type == "AB" & df_filtered$names == "Gallotannins", ]$values)
 
 ```
+
+
+Individuals plot for each MS
+```{r}
+#this is an example
+df_filtered %>%
+  filter(ms == "MS_834")%>%
+  ggplot(aes(x = ATTRIBUTE_type, y = trans_values, color = ATTRIBUTE_type, shape = ATTRIBUTE_type)) +
+stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
+  facet_wrap(.~names)+
+  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+    scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(y = "Normalized concentration", x = "Treatment", color = "Treatment", shape = "Treatment")+
+  geom_hline(yintercept  = 0, color = "red", linetype = "dashed", alpha = 0.5)+
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        strip.text = element_text(size= 18))
+
+day0_chem.plot
+
+
+```
+
+
 
 
 ```{r}
