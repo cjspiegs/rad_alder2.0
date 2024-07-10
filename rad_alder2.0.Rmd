@@ -3003,7 +3003,7 @@ for (X in X_values) {
       (mass.present.site1.df[mass.present.site1.df$names == armlb_name, "values"] +
       mass.present.site1.df[mass.present.site1.df$names == brmla_name, "values"])/2
     )*100
-)
+)-100
     
      # Create a new name (letter) for the result
     result_name <- LETTERS[(X - 1) * 5 + Y]
@@ -3050,7 +3050,7 @@ for (X in X_values) {
       (mass.absent.site1.df[mass.absent.site1.df$names == armlb_name, "values"] +
       mass.absent.site1.df[mass.absent.site1.df$names == brmla_name, "values"])/2
     )*100
-)
+)-100
      # Create a new name (letter) for the result
 result_name <- paste0(LETTERS[(X - 1) * 5 + Y], "_1")
 
@@ -3524,7 +3524,7 @@ for (X in X_values) {
       (mass.present.site2.df[mass.present.site2.df$names == armlb_name, "values"] +
       mass.present.site2.df[mass.present.site2.df$names == brmla_name, "values"])/2
     )*100
-)
+)-100
      # Create a new name (letter) for the result
     result_name <- paste0(LETTERS[(X - 1) * 5 + Y], "_2")
     
@@ -3574,7 +3574,7 @@ for (X in X_values) {
       (mass.absent.site2.df[mass.absent.site2.df$names == armlb_name, "values"] +
       mass.absent.site2.df[mass.absent.site2.df$names == brmla_name, "values"])/2
     )*100
-)
+)-100
      # Create a new name (letter) for the result
     result_name <- paste0(LETTERS[(X - 1) * 5 + Y], "_3")
     
@@ -3621,12 +3621,27 @@ hfa.fig.formatting <- theme_classic() +
 
 5/7/24 explore the data with NEW stat knowledge
 ```{r}
+hfai.allsites.plot
+
+hfai.allsites.plot
+
+
+min(hfai.allsites_removed$values)
+   
+   hfai.allsites.df%>%
+     pull(values)%>%
+     range()
+
+ggsave("figures/hfai.allsites.plot.pdf", hfai.allsites.plot, width = 8, height = 6)
+
 #normality
 hist(hfai.allsites.df[hfai.allsites.df$treatment=="P",]$values)
 hist(hfai.allsites.df[hfai.allsites.df$treatment=="AB",]$values)
 #subset by treatment
 present<- hfai.allsites.df[hfai.allsites.df$treatment=="P",]$values
 absent<- hfai.allsites.df[hfai.allsites.df$treatment=="AB",]$values
+#normality
+normalTest(present, method = "da")
 #model
 m1<- lm(values ~ treatment, data = hfai.allsites.df)
 plot(m1)
@@ -3664,7 +3679,7 @@ hfai.allsites_removed<-hfai.allsites.df[-c(26, 27, 28,29, 30), ]
 #normality
 present_rm<- hfai.allsites_removed[hfai.allsites_removed$treatment=="P",]$values
 absent_rm<- hfai.allsites_removed[hfai.allsites_removed$treatment=="AB",]$values
-normalTest(absent, method = "da")
+normalTest(present_rm, method = "da")
 #removed model
 m1<- lm(values ~ treatment, data = hfai.allsites_removed)
 plot(m1)
@@ -3678,24 +3693,59 @@ sd(hfai.allsites_removed$values)
 hist(hfai.allsites_removed$values)
 
 #plot
-hfai.allsites.plot<- hfai.allsites_removed %>%
+hfai.allsites_removed.plot<- hfai.allsites_removed %>%
   filter(!is.na(values)) %>%
-  ggplot(aes(x = treatment, y = values, color = treatment, fill = treatment)) +
-  geom_violin(width= 0.4, alpha = 0.4) +
-  geom_point(alpha = 0.3, position = position_jitter(width = 0.1), size = 2) +  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, color = "black", position = position_dodge(width = 0.4)) +
-  scale_color_manual(values = c("#CC79A7", "#009E73"), labels = c("absent", "present")) +
-  scale_fill_manual(values = c("#CC79A7", "#009E73"), labels = c("absent", "present")) +
-  xlab("") +
-  ylab("magnitude of decomposition at home (%)") +
+ggplot(aes(x = treatment, y = values, color = treatment, shape = treatment)) +
+    stat_summary(fun = "mean", geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = "mean_cl_normal", geom = "errorbar", width = 0.2, position = position_dodge(width = 0.5), size = 1.2) +
+  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+    scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+geom_hline(aes(yintercept = 0), color = "red3", linetype = "dashed") +
+   labs(x = "Treatment", y = "Magnitude of decomposition (%)", color = "Treatment", shape = "Treatment" ) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+    scale_y_continuous(breaks = seq(-20, 20, by = 5))+
   theme_bw() +
-  theme(axis.text = element_text(size = 12)) +
-  theme(legend.position = "right") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "red")+ theme(plot.margin = unit(c(2, 2, 2, 2), "lines"))
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+  
+ hfai.allsites_removed %>%
+  filter(treatment == "P") %>%
+  summarise(
+    mean_value = mean(values, na.rm = TRUE),
+    lower_ci = mean_cl_normal(values)$ymin,
+    upper_ci = mean_cl_normal(values)$ymax
+  )
+ 
+# Filter the data for treatment "P"
+filtered_data <- hfai.allsites_removed %>%
+  filter(treatment == "AB") %>%
+  pull(values)
+
+# Calculate the mean
+mean<- mean(filtered_data, na.rm = TRUE)
+
+# Calculate the standard deviation
+sd_value <- sd(filtered_data, na.rm = TRUE)
+
+# Calculate the standard error
+n <- length(filtered_data<0)
+se <- sd_value / sqrt(n)
+
+group_P <- hfai.allsites_removed$values[hfai.allsites_removed$treatment == "P"]
+group_AB <- hfai.allsites_removed$values[hfai.allsites_removed$treatment == "AB"]
+
+# Perform the t-test
+t.test(group_P, group_AB)
+
+
+
 
 
 hfai.allsites.plot
 
-ggsave("figures/hfai.allsites.plot.pdf", hfai.allsites.plot, width = 8, height = 6)
+ggsave("figures/hfai.allsites_removed.plot.png", hfai.allsites_removed.plot, width = 8, height = 6)
 
 
 
@@ -3948,17 +3998,16 @@ hfai.allsites.df %>%
 
 hfai.allsites.plot
 
-
-hfai.allsites.plot<- hfai.allsites.df %>%
+filter(values<180)
+hfai.allsites.plot
+hfai.allsites.df %>%
   filter(!is.na(values)) %>%
-  filter(values<180) %>%
-  ggplot(aes(x = treatment, y = values, color = treatment, shape = treatment)) +
+ggplot(aes(x = treatment, y = values, color = treatment, shape = treatment)) +
   stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
     scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
 geom_hline(aes(yintercept = mean(values)), color = "red3", linetype = "dashed") +
-  scale_y_continuous(breaks = seq())
    labs(x = "treatment", y = "magnitude of decomposition (%)") +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
   theme_bw() +
@@ -3966,6 +4015,11 @@ geom_hline(aes(yintercept = mean(values)), color = "red3", linetype = "dashed") 
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
+
+hfai.allsites.plot
+
+
+min(hfai.allsites_removed$values)
    
    hfai.allsites.df%>%
      pull(values)%>%
@@ -3973,7 +4027,7 @@ geom_hline(aes(yintercept = mean(values)), color = "red3", linetype = "dashed") 
 
 ggsave("figures/hfai.allsites.plot.pdf", hfai.allsites.plot, width = 8, height = 6)
 
-
+summary(hfai.allsites_removed)
 
 
 
