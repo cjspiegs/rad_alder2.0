@@ -329,7 +329,6 @@ Model for at home only
 ##best big home model
 meta_bighomemod<- lmer(log_od ~ treatment + (treatment | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
 
-
 meta_bighomemod2<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
 
 meta_bighomemod3<- lmer(log_od ~ treatment + (0 + treatment| decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
@@ -382,6 +381,8 @@ anova(meta_home_inter_decompmod,meta_bighomemod )
 
 #holding decomposition day 
 meta_home_add_decompmod<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+
+summary(meta_home_add_decompmod)
 
 anova(meta_home_inter_decompmod,meta_home_add_decompmod )
 AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
@@ -481,15 +482,16 @@ ggsave("figures/meta.biginteract_plot.png", meta.biginteract_plot, width = 14, h
 
 
 ###at home only——present vs absent plot
+#across decomposition
 meta.homeonly_plot<- true_home.16.meta.df%>%
   filter(group == "H") %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = treatment, shape = treatment)) +
-  stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  stat_summary(fun = "mean", geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = "mean_cl_normal", geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
   geom_hline(aes(yintercept = mean(log_od)), color = "red3", linetype = "dashed") +
-  labs(x = "decomposition day", y = expression("log(OD"[450 * nm]*")")) +
+  labs(color = "Treatment", shape = "Treatment", x = "Decomposition day", y = expression("Log(OD"[450 * nm]*")")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
   theme_bw() +
   theme(axis.text = element_text(size = 18),
@@ -499,12 +501,66 @@ meta.homeonly_plot<- true_home.16.meta.df%>%
 
 ggsave("figures/meta.homeonly_plot.png", meta.homeonly_plot, width = 14, height = 7)
 
+#treatment
+meta.homeonly_trt_plot<- true_home.16.meta.df%>%
+  filter(group == "H") %>%
+  ggplot(aes(x = as.factor(treatment), y = log_od, color = treatment, shape = treatment)) +
+  stat_summary(fun = "mean", geom = "point", size = 6, position = position_dodge(width = 0.5)) +
+  stat_summary(fun.data = "mean_cl_normal", geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  scale_color_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(color = "Treatment", shape = "Treatment", x = "Treatment", y = expression("Log(OD"[450 * nm]*")")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+meta.homeonly_trt_meanplot<- true_home.16.meta.df %>%
+  filter(group == "H") %>%
+  ggplot(aes(x = as.factor(treatment), y = od_corrected_b_n, color = treatment, shape = treatment)) +
+  geom_point(position = position_jitter(width = 0.15), size = 1.5, alpha = 0.5) + # Smaller points with transparency
+  stat_summary(fun = "mean", geom = "point", size = 4, position = position_dodge(width = 0.5)) + # Slightly smaller summary points
+  stat_summary(fun.data = "mean_cl_normal", geom = "errorbar", width = 0.2, position = position_dodge(width = 0.5), size = 1.2) + # Reduced width of error bars
+  scale_color_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(color = "Treatment", shape = "Treatment", x = "Treatment", y = expression("Microbial metabolization (OD"[450 * nm]*")")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+meta.homeonly_trt_boxplot<- true_home.16.meta.df %>%
+  filter(group == "H") %>%
+  ggplot(aes(x = as.factor(treatment), y = od_corrected_b_n, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("Microbial metabolization (OD"[450 * nm]*")")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+ggsave("figures/meta.homeonly_trt_boxplot.png", meta.homeonly_trt_boxplot, width = 7, height = 5)
+
+```
+
+
+```{r}
 ###just present treatment——home vs away plot
 meta.p_only_plot<- true_home.16.meta.df %>%
   filter(treatment == "P") %>%
   ggplot(aes(x = as.factor(decomp_day), y = log_od, color = group, shape = group)) +
   stat_summary(fun = mean, geom = "point", size = 6, position = position_dodge(width = 0.5)) +
-  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1.2) +
+  stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.2), size = 1.2) +
   scale_color_manual(values = c("AW" = "black", "H" = "grey60"), labels = c("away", "home")) +
   scale_shape_manual(values = c("AW" = 17, "H" = 16), labels = c("away", "home")) +
   geom_hline(aes(yintercept = mean(log_od)), color = "red3", linetype = "dashed") +
@@ -542,7 +598,7 @@ meta.mean.noabaw_plot<- filtered_data %>%
   scale_color_tableau(palette = "Color Blind", labels = c("away", "home")) +
   scale_shape_manual(values = c(17, 16), labels = c("absent", "present"))+
   geom_hline(aes(yintercept = mean(log_od)), color = "red3", linetype = "dashed") +
-  labs(x = "decomposition day", y = expression("log(OD"[450 * nm]*")")) +
+  labs( x = "Decomposition day", y = expression("Log(OD"[450 * nm]*")")) +
   theme_bw() +
   theme(axis.text = element_text(size = 16),
         axis.title = element_text(size = 16),
@@ -3655,7 +3711,7 @@ hfai.allsites.df<- hfai.allsites.df %>%
    group_by(treatment)%>%
   mutate(trans.val = log2(values))
 
-hfai.allsites.df %>%
+hfai.allsites_removed %>%
    group_by(treatment)%>%
   mutate(fold.change = log2(treatment == "P", values)- log2(treatment == "AB", values))
  
@@ -3693,12 +3749,13 @@ sd(hfai.allsites_removed$values)
 hist(hfai.allsites_removed$values)
 
 #plot
+#mean plot
 hfai.allsites_removed.plot<- hfai.allsites_removed %>%
   filter(!is.na(values)) %>%
 ggplot(aes(x = treatment, y = values, color = treatment, shape = treatment)) +
     stat_summary(fun = "mean", geom = "point", size = 6, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = "mean_cl_normal", geom = "errorbar", width = 0.2, position = position_dodge(width = 0.5), size = 1.2) +
-  scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
+  scale_color_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
     scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
 geom_hline(aes(yintercept = 0), color = "red3", linetype = "dashed") +
    labs(x = "Treatment", y = "Magnitude of decomposition (%)", color = "Treatment", shape = "Treatment" ) +
@@ -3718,6 +3775,23 @@ geom_hline(aes(yintercept = 0), color = "red3", linetype = "dashed") +
     upper_ci = mean_cl_normal(values)$ymax
   )
  
+ggsave("figures/hfai.allsites_removed.plot.png", hfai.allsites_removed.plot, width = 8, height = 6)
+
+#bar plot
+hfai.allsites_removed.barplot<- hfai.allsites_removed%>%
+  filter(!is.na(values)) %>%
+  ggplot(aes(x = reorder(names, values), y = values, fill = treatment, width = 0.85)) +
+scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  labs(x = "", y = "Magnitude of decomposition (%)", fill = "Treatment") +
+geom_bar(stat = "identity", position ="dodge", alpha = 0.7) +
+  theme_minimal() +
+    scale_x_discrete(expand = c(0.01,0.01))+
+  geom_vline(xintercept = 44.5 , linetype = "dashed", color = "red")+
+  hfa.fig.formatting
+
+ggsave("figures/hfai.allsites_removed.barplot.png", hfai.allsites_removed.barplot, width = 8, height = 6)
+
+ 
 # Filter the data for treatment "P"
 filtered_data <- hfai.allsites_removed %>%
   filter(treatment == "AB") %>%
@@ -3734,6 +3808,10 @@ n <- length(filtered_data<0)
 se <- sd_value / sqrt(n)
 
 group_P <- hfai.allsites_removed$values[hfai.allsites_removed$treatment == "P"]
+
+group_P<- hfai.allsites_removed[hfai.allsites_removed$treatment == "P",]$values
+group_AB<- hfai.allsites_removed[hfai.allsites_removed$treatment == "AB",]$values
+
 group_AB <- hfai.allsites_removed$values[hfai.allsites_removed$treatment == "AB"]
 
 # Perform the t-test
@@ -3745,7 +3823,6 @@ t.test(group_P, group_AB)
 
 hfai.allsites.plot
 
-ggsave("figures/hfai.allsites_removed.plot.png", hfai.allsites_removed.plot, width = 8, height = 6)
 
 
 
@@ -3934,10 +4011,10 @@ range(positive_values[positive_values$treatment == "P",]$values)
 #all sites
 range(hfai.allsites.df$values)
 
-hfai.allsites.plot=hfai.allsites.df%>%
+hfai.allsites_removed%>%
   filter(!is.na(values)) %>%
   ggplot(aes(x = reorder(names, values), y = values, fill = treatment, width = 0.85)) +
-scale_fill_manual(values  = c("#CC79A7", "#009E73"))+
+scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
 geom_bar(stat = "identity", position ="dodge", alpha = 0.7) +
   xlab("") +
   ylab("% faster decomposition at home") +
@@ -5015,76 +5092,4 @@ scale_color_manual(values = c("#CC79A7", "#009E73")) +
 
 # %N
 perc.N.aov=aov(perc.N ~ treatment, data =isotope.df)
-perc.N.tHSD=TukeyHSD(perc.N.aov, ordered = F, conf.level = 0.95)
-perc.N.cld <- multcompLetters4(perc.N.aov, d15N.tHSD)
-
-# table with factors and 3rd quantile
-perc.N.table <- isotope.df%>%
-  dplyr::group_by(treatment) %>%
-  dplyr::summarise(mean=mean(perc.N), quant = quantile(perc.N, probs = 0.75)) %>%
-  dplyr::arrange(desc(mean))
-
-# extracting the compact letter display and adding to the Tk table
-perc.N.cld <- as.data.frame.list(perc.N.cld$treatment)
-perc.N.table$cld <- perc.N.cld$Letters
-
-#plot
-perc.N.plot=isotope.df %>%
-  ggplot(aes(x = treatment, y = perc.N, fill = treatment)) +
-  geom_boxplot(alpha = 0.6) +
-  xlab("treatment")+
-  ylab("% N")+
-  geom_point(aes(shape = as.factor(site_num)), position = position_jitter(width = 0.15))+
- scale_color_manual(values = c("#CC79A7", "#009E73")) +
-    scale_fill_manual(values = c("#CC79A7", "#009E73")) +
-  geom_hline(aes(yintercept = mean(perc.N), linetype = "Average"), color = alpha("red", 1), linetype = "dashed") +
-  theme_classic()+
-  theme(plot.title = element_text(face = "bold"))+
-  geom_text(data = perc.N.table, aes(y = quant, label = cld), color = "blue", fontface= "bold",size = 5, vjust=-2, hjust =-0.76)+
-  theme_classic()
-
-prelim.isotope.plot=plot_grid(
-  C_N.plot,
-  d13C.plot,
-  d15N.plot,
-  perc.C.plot,
-  perc.N.plot,
-  rel_widths = c(8,8,8,8,8))
-  
-  
-ggsave("figures/prelim.isotope.plot.pdf", prelim.isotope.plot, width = 18, height = 12)
-
-
-
-```
-
-
-
-Playing around with mzMine
-```{r}   
-
-norm <- read.csv("/Users/Cody1/Desktop/Projects/RAD Alder/LC-MS/RAD_negative_mode_11_3_2023_quant_copy.csv")
-norm <- norm %>% dplyr::select(-X)
-norm <- norm %>% rename_with(~str_replace_all(., ".mzML.Peak.area", ""))
-norm <- norm %>% dplyr::select(-(row.m.z:correlation.group.ID), -(best.ion:neutral.M.mass))
-norm <- norm %>% mutate(across(row.ID:annotation.network.number, as.character))
-norm
-
-lib<- read.delim("/Users/Cody1/Downloads/ProteoSAFe-FEATURE-BASED-MOLECULAR-NETWORKING-6622b124-view_all_clusters_withID/DB_result/411d53da00ef4c329314baffe5ce6812.tsv")
-
-
-# Merge the data frames based on common column "row.ID" in df1 and "scan" in df2
-merged_df <- norm %>%
-  inner_join(lib, by = c(as.integer("row.ID") = "X.Scan."))
-
-# Select the columns of interest
-result_df <- merged_df %>%
-  select(row.ID, compound_name, compound_class, starts_with("sample"))
-
-print(result_df)
-
-
-
-
-```
-
+perc.N.tHSD=TukeyHS
