@@ -384,6 +384,21 @@ meta_home_add_decompmod<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | depl
 
 summary(meta_home_add_decompmod)
 
+mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "P",]$log_od)
+mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "AB",]$log_od)
+
+
+# Assuming log_fold_change has already been calculated
+log_fold_change <- mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "P",]$log_od)-
+mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "AB",]$log_od)
+
+# Calculate the fold change
+fold_change <- exp(log_fold_change)
+
+# Convert the fold change to a percentage
+percentage_increase <- (fold_change - 1) * 100
+percentage_increase
+
 anova(meta_home_inter_decompmod,meta_home_add_decompmod )
 AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
 
@@ -5048,9 +5063,10 @@ c_n_boxplot<- isotope.df %>%
   theme(axis.text = element_text(size = 18),
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18))
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
 
-ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 10, height = 7)
+ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 10, height = 8)
 
 #c:n stats
 t.test(isotope.df[isotope.df$treatment == "P",]$c_n,isotope.df[isotope.df$treatment == "AB",]$c_n)
