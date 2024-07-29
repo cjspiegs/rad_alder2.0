@@ -4221,36 +4221,26 @@ neg_long.df<- pivot_longer(neg_data, cols = starts_with("MS_"),
 #merge df with metadata
 df_final <- merge(neg_long.df, neg_metadata, by = "Sample")
 
+#shift values to positive
+df_final<- df_final%>%
+  mutate(shifted_values = values + 1)
 
-#check min of data
-if (any(neg_long.df$values <= 0)) {
-  print("Data contains non-positive values.")
-}
-
-###apply box cox model
-model <- lm(values ~ ATTRIBUTE_type, data = df_final)
-
-# Apply Box-Cox transformation
-bc <- boxcox(model, lambda = seq(-2, 2, by = 0.1))
-
-# Find the optimal lambda
-lambda_opt <- bc$x[which.max(bc$y)]
-print(lambda_opt)
-
-#check distribution
-hist(neg_long.df$values)
+#add a log transformation
+df_final<- df_final%>%
+    group_by(Sample, ms, ATTRIBUTE_type,ATTRIBUTE_Sitenum, ATTRIBUTE_TreeID, ATTRIBUTE_Treenum ) %>%
+  mutate(log_trans = log(shifted_values))
 
 #Normalize by median within each ms group
-neg_long.df <- neg_long.df %>%
-  group_by(ms) %>%
-  mutate(trans_values = values / median(values, na.rm = TRUE))
+df_final <- df_final %>%
+  group_by( ms ) %>%
+  mutate(trans_values = shifted_values / median(shifted_values, na.rm = TRUE))
 
 # Step 3: Log transformation (base 10)
-neg_long.df <- neg_long.df %>%
+df_final <- df_final %>%
   mutate(trans_values = log10(trans_values + 1))  # Adding 1 to handle zero values before log transformation
 
 # Step 4: Mean-centered scaling by standard deviation within each ms group
-neg_long.df <- neg_long.df %>%
+df_final <- df_final %>%
   group_by(ms) %>%
   mutate(trans_values = (trans_values - mean(trans_values, na.rm = TRUE)) / sd(trans_values, na.rm = TRUE))
 
@@ -4287,6 +4277,8 @@ df_final<- df_final %>%
 ```
 
 Filter gallotannins, diarylheptanoids, and shikimic acids
+
+this one works!
 ```{r}
 #filter for MS of interest
 ms_of_interest <- c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", 
@@ -4310,7 +4302,43 @@ ms_names_mapping <- data.frame(
 # Step 7: Merge with the mapping table to add the names column
 df_filtered <- merge(df_filtered, ms_names_mapping, by.x = "ms", by.y = "MS")
 
-hist(df_filtered[df_filtered$names == "Shikimic acids and derivatives",]$log)
+###apply box cox model
+model <- lm(shifted_values ~ ATTRIBUTE_type, data = df_filtered)
+
+# Apply Box-Cox transformation
+bc <- boxcox(model, lambda = seq(-2, 2, by = 0.1))
+
+# Find the optimal lambda
+lambda_opt <- bc$x[which.max(bc$y)]
+
+#apply transformation
+df_filtered <- df_filtered %>%
+  group_by(Sample, ms, ATTRIBUTE_type, ATTRIBUTE_Treenum, ATTRIBUTE_TreeID)%>%
+  mutate(boxcox = ifelse(lambda_opt == 0,
+                                     log(shifted_values), 
+                                     (shifted_values^lambda_opt - 1) / lambda_opt))%>%
+  ungroup()
+
+#check dist.
+hist(df_filtered$boxcox)
+min(df_filtered$boxcox)
+max(df_filtered$boxcox)
+
+#within treatment
+hist(df_filtered[df_filtered$ATTRIBUTE_type == "AB",]$boxcox)
+
+hist(log(df_filtered[df_filtered$ATTRIBUTE_type == "AB",]$boxcox))
+
+
+#print
+print(df_filtered)
+
+```
+
+this is same as above...
+```{r}
+###############
+
 
 # keep MS of interest
 columns_to_keep <- c("Sample", "ATTRIBUTE_type", "ATTRIBUTE_TreeID", "ATTRIBUTE_Sitenum", "ATTRIBUTE_Treenum",
@@ -4446,7 +4474,8 @@ df_long <- pivot_longer(filtered_df, cols = starts_with("MS_"),
 
 ```{r}
 #plot
-day0_chem.plot<- df_filtered %>%
+#mean plot
+day0_chem_mean.plot<- df_filtered %>%
   ggplot(aes(x = ATTRIBUTE_type, y = trans_values, color = ATTRIBUTE_type, shape = ATTRIBUTE_type)) +
 stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
@@ -4463,45 +4492,34 @@ stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(wid
         legend.title = element_text(size = 18),
         strip.text = element_text(size= 18))
 
-
-df_filtered %>%
-  ggplot(aes(x = as.factor(ATTRIBUTE_type), y = log, fill = ATTRIBUTE_type, shape = ATTRIBUTE_type, na.omit = T)) +
+#boxplot
+day0_chem_boxplot<- df_filtered %>%
+  ggplot(aes(x = as.factor(ATTRIBUTE_type), y = boxcox, fill = ATTRIBUTE_type, shape = ATTRIBUTE_type, na.omit = T)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
   scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
       facet_wrap(.~names)+
-  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("Log(relative abundance)")) +
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("Boxcox transformed values")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
   theme_bw() +
   theme(axis.text = element_text(size = 18),
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18))
+        legend.title = element_text(size = 18),
+        strip.text = element_text(size = 18))
 
+day0_chem_boxplot
 
-day0_chem.plot
-
-ggsave("figures/day0_chem.plot.png", day0_chem.plot, width = 14, height = 7)
+ggsave("figures/day0_chem_boxplot.png", day0_chem_boxplot, width = 14, height = 7)
 
 
 # Subset the data for "Linear diarylheptanoids"
 hist(log(df_filtered[df_filtered$names == "Linear diarylheptanoids",]$values)+1)
 compound <- "Linear diarylheptanoids"
 df_sub <- df_filtered[df_filtered$names == compound, ]
-# Check for zero variance within each group
-df_sub_clean %>%
-  group_by(ATTRIBUTE_type) %>%
-  mutate(
-    count = n(),
-    unique_values = n_distinct(log),
-    mean = mean(log, na.rm = TRUE),
-    sd = sd(log, na.rm = TRUE),
-    .groups = 'drop'
-  )
-
-t.test(log ~ ATTRIBUTE_type, data = df_sub)
+t.test(boxcox ~ ATTRIBUTE_type, data = df_sub)
 
 
 # Subset the data for "Gallotannins"
@@ -4509,14 +4527,14 @@ hist(sqrt(df_filtered[df_filtered$names == "Gallotannins",]$trans_values))
 compound <- "Gallotannins"
 df_sub <- df_filtered[df_filtered$names == compound, ]
 # Perform t-test
-t.test(values ~ ATTRIBUTE_type, data = df_sub)
+t.test(boxcox ~ ATTRIBUTE_type, data = df_sub)
 
 # Subset the data for "Shikimic acids"
 hist(log(df_filtered[df_filtered$names.x == "Shikimic acids and derivatives",]$values))
 compound <- "Shikimic acids and derivatives"
-df_sub <- df_filtered[df_filtered$names.x == compound, ]
+df_sub <- df_filtered[df_filtered$names == compound, ]
 # Perform t-test
-t.test(values ~ ATTRIBUTE_type, data = df_sub)
+t.test(boxcox ~ ATTRIBUTE_type, data = df_sub)
 
 mean(df_filtered[df_filtered$ATTRIBUTE_type == "AB" & df_filtered$names == "Gallotannins", ]$values)
 
