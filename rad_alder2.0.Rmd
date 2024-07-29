@@ -5032,7 +5032,7 @@ c_n_boxplot<- isotope.df %>%
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
 
-ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 14, height = 7)
+ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 10, height = 7)
 
 #c:n stats
 t.test(isotope.df[isotope.df$treatment == "P",]$c_n,isotope.df[isotope.df$treatment == "AB",]$c_n)
@@ -5091,7 +5091,7 @@ perc_n_boxplot<- isotope.df %>%
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
 
-ggsave("figures/perc_n_boxplot.png", perc_n_boxplot, width = 14, height = 7)
+ggsave("figures/perc_n_boxplot.png", perc_n_boxplot, width = 10, height = 7)
 
 
 
