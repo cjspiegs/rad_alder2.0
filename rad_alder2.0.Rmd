@@ -4218,6 +4218,27 @@ all(neg_data$Sample == neg_metadata$Sample)
 #make long
 neg_long.df<- pivot_longer(neg_data, cols = starts_with("MS_"), 
                         names_to = "ms", values_to = "values")
+#merge df with metadata
+df_final <- merge(neg_long.df, neg_metadata, by = "Sample")
+
+
+#check min of data
+if (any(neg_long.df$values <= 0)) {
+  print("Data contains non-positive values.")
+}
+
+###apply box cox model
+model <- lm(values ~ ATTRIBUTE_type, data = df_final)
+
+# Apply Box-Cox transformation
+bc <- boxcox(model, lambda = seq(-2, 2, by = 0.1))
+
+# Find the optimal lambda
+lambda_opt <- bc$x[which.max(bc$y)]
+print(lambda_opt)
+
+#check distribution
+hist(neg_long.df$values)
 
 #Normalize by median within each ms group
 neg_long.df <- neg_long.df %>%
@@ -4252,17 +4273,28 @@ df_final %>%
   labs(x = "Values", y = "Density") +  # Labels for axes
   theme_minimal()  # Optional: Use a minimal theme
 
+#### z scoreing ####
+z_score <- function(x) {
+  return((x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
+}
+
+df_final<- df_final %>%
+  group_by(Sample) %>%
+  mutate(log = log(values)+1)%>%
+  ungroup()
+
+
 ```
 
 Filter gallotannins, diarylheptanoids, and shikimic acids
 ```{r}
-# Step 6: Filter for MS of interest
+#filter for MS of interest
 ms_of_interest <- c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", 
                     "MS_834", "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", 
                     "MS_1300", "MS_1422", "MS_1431", "MS_1442", "MS_1456")
 df_filtered <- df_final %>% filter(ms %in% ms_of_interest)
 
-# Example mapping table (replace with your actual data)
+#mapping
 ms_names_mapping <- data.frame(
   MS = c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", "MS_834", 
          "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", "MS_1300", "MS_1422", 
@@ -4277,6 +4309,8 @@ ms_names_mapping <- data.frame(
 
 # Step 7: Merge with the mapping table to add the names column
 df_filtered <- merge(df_filtered, ms_names_mapping, by.x = "ms", by.y = "MS")
+
+hist(df_filtered[df_filtered$names == "Shikimic acids and derivatives",]$log)
 
 # keep MS of interest
 columns_to_keep <- c("Sample", "ATTRIBUTE_type", "ATTRIBUTE_TreeID", "ATTRIBUTE_Sitenum", "ATTRIBUTE_Treenum",
@@ -4305,7 +4339,7 @@ columns_to_keep <- c("Sample", "ATTRIBUTE_type", "ATTRIBUTE_TreeID", "ATTRIBUTE_
                           )
 
 # Remove columns not in the specified list
-filtered_df <- neg_data[, c(columns_to_keep)]
+filtered_df <- df_final[, c(columns_to_keep)]
 # Example mapping table (replace with your actual data)
 ms_names_mapping <- data.frame(
   MS = c("MS_363",
@@ -4334,7 +4368,6 @@ ms_names_mapping <- data.frame(
             "Shikimic acids and derivatives", 
             "Shikimic acids and derivatives", 
             "Shikimic acids and derivatives", 
-            
             "Shikimic acids and derivatives", 
             "Shikimic acids and derivatives", 
             "Linear diarylheptanoids", 
@@ -4362,6 +4395,52 @@ filtered_df <- merge(filtered_df, ms_names_mapping)
 df_long <- pivot_longer(filtered_df, cols = starts_with("MS_"), 
                         names_to = "ms", values_to = "values")
 
+
+
+#########################
+ms_of_interest <- c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", 
+                    "MS_834", "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", 
+                    "MS_1300", "MS_1422", "MS_1431", "MS_1442", "MS_1456")
+df_filtered <- df_final %>% filter(ms %in% ms_of_interest)
+
+# Mapping table
+ms_names_mapping <- data.frame(
+  MS = c("MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823", "MS_834", 
+         "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297", "MS_1300", "MS_1422", 
+         "MS_1431", "MS_1442", "MS_1456"),
+  names = c("Shikimic acids and derivatives", "Shikimic acids and derivatives", "Shikimic acids and derivatives", 
+            "Shikimic acids and derivatives", "Shikimic acids and derivatives", "Shikimic acids and derivatives", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", "Gallotannins", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", "Linear diarylheptanoids", 
+            "Linear diarylheptanoids", "Linear diarylheptanoids", "Gallotannins", "Gallotannins")
+)
+
+# Merge with the mapping table to add the names column
+df_filtered <- merge(df_filtered, ms_names_mapping, by.x = "ms", by.y = "MS")
+
+print(colnames(df_filtered))
+
+# Columns to keep
+columns_to_keep <- c("Sample", "ATTRIBUTE_type", "ATTRIBUTE_TreeID", "ATTRIBUTE_Sitenum", "ATTRIBUTE_Treenum",
+                     "MS_363", "MS_371", "MS_372", "MS_369", "MS_475", "MS_646", "MS_752", "MS_754", "MS_823",
+                     "MS_834", "MS_895", "MS_929", "MS_1141", "MS_1203", "MS_1205", "MS_1240", "MS_1297",
+                     "MS_1300", "MS_1422", "MS_1431", "MS_1442", "MS_1456")
+
+# Check and keep only the existing columns
+existing_columns_to_keep <- columns_to_keep[columns_to_keep %in% colnames(df_filtered)]
+
+# Subset the dataframe
+filtered_df <- df_filtered[, c(existing_columns_to_keep, "names")]
+
+print(colnames(filtered_df))
+
+
+# Pivot to long format
+df_long <- pivot_longer(filtered_df, cols = starts_with("MS_"), 
+                        names_to = "ms", values_to = "values")
+
+
 ```
 
 
@@ -4384,26 +4463,58 @@ stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(wid
         legend.title = element_text(size = 18),
         strip.text = element_text(size= 18))
 
+
+df_filtered %>%
+  ggplot(aes(x = as.factor(ATTRIBUTE_type), y = log, fill = ATTRIBUTE_type, shape = ATTRIBUTE_type, na.omit = T)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+      facet_wrap(.~names)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("Log(relative abundance)")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+
 day0_chem.plot
 
 ggsave("figures/day0_chem.plot.png", day0_chem.plot, width = 14, height = 7)
 
 
 # Subset the data for "Linear diarylheptanoids"
+hist(log(df_filtered[df_filtered$names == "Linear diarylheptanoids",]$values)+1)
 compound <- "Linear diarylheptanoids"
 df_sub <- df_filtered[df_filtered$names == compound, ]
-# Perform t-test
-t.test(values ~ ATTRIBUTE_type, data = df_sub)
+# Check for zero variance within each group
+df_sub_clean %>%
+  group_by(ATTRIBUTE_type) %>%
+  mutate(
+    count = n(),
+    unique_values = n_distinct(log),
+    mean = mean(log, na.rm = TRUE),
+    sd = sd(log, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+t.test(log ~ ATTRIBUTE_type, data = df_sub)
+
 
 # Subset the data for "Gallotannins"
+hist(sqrt(df_filtered[df_filtered$names == "Gallotannins",]$trans_values))
 compound <- "Gallotannins"
 df_sub <- df_filtered[df_filtered$names == compound, ]
 # Perform t-test
 t.test(values ~ ATTRIBUTE_type, data = df_sub)
 
 # Subset the data for "Shikimic acids"
+hist(log(df_filtered[df_filtered$names.x == "Shikimic acids and derivatives",]$values))
 compound <- "Shikimic acids and derivatives"
-df_sub <- df_filtered[df_filtered$names == compound, ]
+df_sub <- df_filtered[df_filtered$names.x == compound, ]
 # Perform t-test
 t.test(values ~ ATTRIBUTE_type, data = df_sub)
 
@@ -4887,7 +4998,8 @@ isotope.df%>%
   summarise(mean(c_n))
 
 ####C:N stats and plot
-c_n.plot<- isotope.df%>%
+#mean plot
+c_n_mean.plot<- isotope.df%>%
   ggplot(aes(treatment, c_n, color = treatment, shape = treatment))+
   stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
@@ -4901,9 +5013,26 @@ geom_hline(aes(yintercept = mean(c_n)), color = "red3", linetype = "dashed") +
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
-c_n.plot
 
 ggsave("figures/c_n.plot.png", c_n.plot, width = 14, height = 7)
+
+#boxplot
+c_n_boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = c_n, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("C:N")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 14, height = 7)
 
 #c:n stats
 t.test(isotope.df[isotope.df$treatment == "P",]$c_n,isotope.df[isotope.df$treatment == "AB",]$c_n)
@@ -4927,7 +5056,8 @@ isotope.df%>%
   normalTest(method = "da")
 
 ####percent N stats and plot
-perc_n.plot<- isotope.df%>%
+#mean 
+perc_n_mean.plot<- isotope.df%>%
   ggplot(aes(treatment, perc.n, color = treatment, shape = treatment))+
   stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
@@ -4944,6 +5074,26 @@ geom_hline(aes(yintercept = mean(perc.n)), color = "red3", linetype = "dashed") 
         legend.title = element_text(size = 18))
 
 ggsave("figures/perc_n.plot.png", perc_n.plot, width = 14, height = 7)
+
+#boxplot
+perc_n_boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = perc.n, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("% Nitrogen")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18))
+
+ggsave("figures/perc_n_boxplot.png", perc_n_boxplot, width = 14, height = 7)
+
+
 
 t.test(isotope.df[isotope.df$treatment == "P",]$perc.n,isotope.df[isotope.df$treatment == "AB",]$perc.n)
   
