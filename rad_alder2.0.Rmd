@@ -381,16 +381,45 @@ anova(meta_home_inter_decompmod,meta_bighomemod )
 
 #holding decomposition day 
 meta_home_add_decompmod<- lmer(log_od ~ treatment + (1 | decomp_day) + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H", data = true_home.16.meta.df)
+summary(meta_home_add_decompmod)
+anova(meta_home_add_decompmod)
+
+day3<- lmer(log_od ~ treatment + (1 | deploy) + (1 | site_num:tree_num), subset= group == "H" & decomp_day == "3", data = true_home.16.meta.df)
+
+anova(day5)
+#ab only
+exp(0.38305)
+#p and ab
+exp(0.50589 + 0.38305)
+#just P
+exp(0.50589 + 0.38305) - exp(0.38305)
+#additive or not
+1.466751+0.9657984
 
 summary(meta_home_add_decompmod)
 
-mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "P",]$log_od)
-mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "AB",]$log_od)
-
+mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "P",]$od_corrected_b_n)
+mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "AB",]$od_corrected_b_n)
+((1.41-1.24)/1.41)*100
 
 # Assuming log_fold_change has already been calculated
 log_fold_change <- mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "P",]$log_od)-
 mean(true_home.16.meta.df[true_home.16.meta.df$treatment == "AB",]$log_od)
+
+#effect of just aquatic microbes
+exp(0.02588)
+#1.026218
+
+#effect of present and absent
+exp(0.21858) + exp(0.02588)
+#2.270526
+
+#effect of just present microbes
+(exp(0.21858) + exp(0.02588)) - exp(0.02588)
+#1.244309
+
+#additive or non-additive
+1.026218 + 1.244309
 
 # Calculate the fold change
 fold_change <- exp(log_fold_change)
@@ -398,6 +427,15 @@ fold_change <- exp(log_fold_change)
 # Convert the fold change to a percentage
 percentage_increase <- (fold_change - 1) * 100
 percentage_increase
+
+#mean difference p vs ab
+#estimate for absent
+exp(0.02588)
+#estimate for present
+exp(0.21858 )
+exp(0.08119)+exp(0.21973 )
+#calculate times greater...
+2.330317/1.026218
 
 anova(meta_home_inter_decompmod,meta_home_add_decompmod )
 AIC(meta_home_inter_decompmod,meta_home_add_decompmod)
@@ -3742,11 +3780,12 @@ hfai.allsites_removed<-hfai.allsites.df[-c(26, 27, 28,29, 30), ]
 #normality
 present_rm<- hfai.allsites_removed[hfai.allsites_removed$treatment=="P",]$values
 absent_rm<- hfai.allsites_removed[hfai.allsites_removed$treatment=="AB",]$values
-normalTest(present_rm, method = "da")
+normalTest(absent_rm, method = "da")
 #removed model
 m1<- lm(values ~ treatment, data = hfai.allsites_removed)
 plot(m1)
 summary(m1)
+Anova(m1)
 #means
 mean_p<- mean(present_rm)
 mean_ab<- mean(absent_rm)
@@ -4147,9 +4186,9 @@ library(ggpubr)
 library(vegan)
 
 ### load negative mode
-neg_data <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/NEG_day0_trans_quant.csv") %>% arrange(Sample)
+neg_data <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/day0_newprotocol_08292024/NEG_day0_newprotocol_trans_quant.csv") %>% arrange(Sample)
 View(neg_data)
-neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/RAD_prelim_metadata_negative_rstudio.csv") %>% arrange(Sample)
+neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/day0_newprotocol_08292024/RAD_prelim_metadata_negative_rstudio.csv") %>% arrange(Sample)
 all(neg_data$Sample == neg_metadata$Sample)
 
 #merge
@@ -4226,13 +4265,31 @@ range(df_long$intensity)
 Day 0 alder chemistry
 ```{r}
 ### load negative mode
-neg_data <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/NEG_day0_trans_quant.csv") %>% arrange(Sample)
-neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/lcms/Negative/Day_0/RAD_prelim_metadata_negative_rstudio.csv") %>% arrange(Sample)
+neg_data.df <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/day0_newprotocol_08292024/NEG_day0_newprotocol_trans_quant.csv") %>% arrange(Sample)
+
+neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/day0_newprotocol_08292024/RAD_prelim_metadata_negative_rstudio.csv") %>% arrange(Sample)
 all(neg_data$Sample == neg_metadata$Sample)
+
+#add MS to column names
+neg_data.df<- neg_data.df %>%
+  rename_with(~ paste0("MS_", .), -1)
+
+#add feature list
+features.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/day0_newprotocol_08292024/feature_list.csv")
+
+#add MS to row names
+features.df<- features.df %>%
+  mutate(ms = paste0("MS_", ms))
+
+
+
+
 
 #make long
 neg_long.df<- pivot_longer(neg_data, cols = starts_with("MS_"), 
                         names_to = "ms", values_to = "values")
+
+
 #merge df with metadata
 df_final <- merge(neg_long.df, neg_metadata, by = "Sample")
 
