@@ -4259,7 +4259,7 @@ filtered_df_long <- df_long[df_long$id %in% unique(df_long$id[1:30]), ]
 ggplot(filtered_df_long, aes(x = intensity, y = id)) +
   geom_boxplot()
 
-range(df_long$intensity)
+hist(df_long$intensity)
 
 ```
 
@@ -4305,15 +4305,37 @@ merged_filtered.df<- merged_df%>%
            npclassifier_superclass == "Apocarotenoids" |
            npclassifier_superclass == "Saccharides")
 
+#shift values to positive
+merged_filtered.df<- merged_filtered.df%>%
+  mutate(shifted_intensity = Intensity + 1)
 
 #log2 fold change
- merged_filtered.df$fold_change <- log2((merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "P",]$Intensity)/(merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "AB",]$Intensity))
+ merged_filtered.df$fold_change <- log2((merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "P",]$shifted_intensity)/(merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "AB",]$shifted_intensity))
  
-#mean fold change
- merged_filtered.df%>%
-   group_by(Sample)%>%
-   mutate(mean_fold = mean(fold_change))
+#log trans
+merged_filtered.df$log_change <- log((merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "P",]$shifted_intensity)/(merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "AB",]$shifted_intensity))
 
+
+#fold change plot
+fold_change.plot<- merged_filtered.df %>%
+  na.omit()%>%
+  ggplot(aes(x = fold_change, y = npclassifier_superclass, color = ATTRIBUTE_type)) +
+  stat_summary(fun = mean, geom = "point", size = 3) +
+  scale_color_manual(values = c("AB" = "grey60", "P" = "black"), labels = c("resident absence", "resident presence")) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red3", size = 1) +  # Add vertical dashed line at x = 0
+  labs(color = "Treatment", 
+       x = "Log2 Fold Change", y = "Compound") +  # Update axis labels
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+ggsave("figures/fold_change.plot.png", fold_change.plot, width = 6, height = 10)
+
+#####
 #plot
 merged_filtered.df%>%
    ggplot(aes(x = ATTRIBUTE_type, y = log(Intensity), fill = npclassifier_superclass, shape = npclassifier_superclass))+
@@ -4331,31 +4353,6 @@ merged_filtered.df%>%
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
 
-#fold change plot
-merged_filtered.df %>%
-  ggplot(aes(x = fold_change, y = npclassifier_superclass, color = npclassifier_superclass)) +
-  geom_point(size = 3, alpha = 0.7) +  # Add dots representing metabolites
-  scale_color_viridis_d() +  # Use Viridis color scale for better visibility
-  scale_shape_manual(values = c("Diarylheptanoids" = 1, 
-                                "Phenolic acids (C6-C1)" = 2, 
-                                "Flavonoids" = 3, 
-                                "Lignans" = 5, 
-                                "Jasmonic acids" = 6, 
-                                "Aromatic polyketides" = 7, 
-                                "Phenylpropanoids (C6-C3)" = 8, 
-                                "Apocarotenoids" = 9, 
-                                "Saccharides" = 10)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "red", size = 1) +  # Add vertical dashed line at x = 0
-  labs(color = "Compound Superclass", shape = "Compound Superclass", 
-       x = "Log Fold Change", y = "Metabolite") +  # Update axis labels
-  theme_bw() +
-  facet_wrap(~ATTRIBUTE_type)+
-  theme(axis.text = element_text(size = 18),
-        axis.title = element_text(size = 18),
-        legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
 
 
 
