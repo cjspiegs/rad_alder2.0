@@ -4320,7 +4320,7 @@ merged_filtered.df$log_change <- log((merged_filtered.df[merged_filtered.df$ATTR
 fold_change.plot<- merged_filtered.df %>%
   na.omit()%>%
   ggplot(aes(x = fold_change, y = npclassifier_superclass, color = ATTRIBUTE_type)) +
-  stat_summary(fun = mean, geom = "point", size = 3) +
+  stat_summary(fun = mean, geom = "point", size = 4) +
   scale_color_manual(values = c("AB" = "grey60", "P" = "black"), labels = c("resident absence", "resident presence")) + 
   geom_vline(xintercept = 0, linetype = "dashed", color = "red3", size = 1) +  # Add vertical dashed line at x = 0
   labs(color = "Treatment", 
@@ -4333,7 +4333,8 @@ fold_change.plot<- merged_filtered.df %>%
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-ggsave("figures/fold_change.plot.png", fold_change.plot, width = 6, height = 10)
+ggsave("figures/fold_change.plot.png", fold_change.plot, width = 9, height = 8)
+ggsave("figures/fold_change.plot.pdf", fold_change.plot, width = 9, height = 8)
 
 #####
 #plot
