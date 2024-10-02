@@ -4259,7 +4259,6 @@ filtered_df_long <- df_long[df_long$id %in% unique(df_long$id[1:30]), ]
 ggplot(filtered_df_long, aes(x = intensity, y = id)) +
   geom_boxplot()
 
-hist(df_long$intensity)
 
 ```
 
@@ -4277,7 +4276,6 @@ neg_metadata <- read_csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_meta
 all(neg_data.df$Sample == neg_metadata$Sample)
 neg_metadata$Sample <- gsub("_Neg", "", neg_metadata$Sample)
 
-
 #add feature list
 features.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/day0_newprotocol_08292024/feature_list.csv")
 features.df<- features.df %>%
@@ -4288,13 +4286,10 @@ neg_data_long.df<- neg_data.df %>%
   pivot_longer(cols = starts_with("MS_"), 
                names_to = "ms", 
                values_to = "Intensity")
-View(neg_data_long.df)
-View(neg_metadata)
 
 #merge
 merged_df<- merge(neg_data_long.df,neg_metadata, by = "Sample")
 merged_df<- merge(merged_df,features.df, by = "ms")
-View(merged_df)
 
 #filter compounds of interest
 merged_filtered.df<- merged_df%>%
@@ -4307,17 +4302,204 @@ merged_filtered.df<- merged_df%>%
 
 #shift values to positive
 merged_filtered.df<- merged_filtered.df%>%
-  mutate(shifted_intensity = Intensity + 1)
+  mutate(log_trans = log(Intensity + 1))
 
-#log2 fold change
- merged_filtered.df$fold_change <- log2((merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "P",]$shifted_intensity)/(merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "AB",]$shifted_intensity))
- 
+
+count_summary <- merged_filtered.df %>%
+  dplyr::group_by(npclassifier_superclass, ATTRIBUTE_type) %>%
+  dplyr::summarise(count = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = ATTRIBUTE_type, values_from = count, values_fill = 0)
+count_summary
+
+###apply box cox model
+model <- lm(shifted_values ~ ATTRIBUTE_type, data = merged_filtered.df)
+
+# Apply Box-Cox transformation
+bc <- boxcox(model, lambda = seq(-2, 2, by = 0.1))
+
+# Find the optimal lambda
+lambda_opt <- bc$x[which.max(bc$y)]
+
+#apply boxcox
+merged_filtered.df <- merged_filtered.df %>%
+  group_by(Sample, ms, ATTRIBUTE_type, ATTRIBUTE_Treenum, ATTRIBUTE_TreeID, superclass, class, subclass, npclassifier_superclass, npclassifier_class, npclassifier_pathway)%>%
+  mutate(boxcox = ifelse(lambda_opt == 0,
+                                     log(shifted_values), 
+                                     (shifted_values^lambda_opt - 1) / lambda_opt))%>%
+  ungroup()
+
+#summarize df
+fold_change_summary <- merged_filtered.df %>%
+  na.omit() %>%
+  dplyr::group_by(npclassifier_superclass) %>%
+  dplyr::summarise(
+    # Calculate the fold change
+    fold_change = log2(mean(boxcox[ATTRIBUTE_type == "P"], na.rm = TRUE) / 
+                       mean(boxcox[ATTRIBUTE_type == "AB"], na.rm = TRUE)),
+    
+    # Perform t-test and extract p-value
+    p_value = t.test(boxcox[ATTRIBUTE_type == "P"], 
+                     boxcox[ATTRIBUTE_type == "AB"])$p.value,
+    
+    # Assign significance based on p-value
+    sig = ifelse(p_value < 0.05, "significant", "not significant"),
+    
+    # Drop the grouping after summarizing
+    .groups = 'drop'
+  )
+
+#plot
+fold_change.plot<- ggplot(fold_change_summary, aes(x = fold_change, y = npclassifier_superclass)) +
+  geom_point(aes(color = sig), size = 4) +  
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red3", size = 1) +  
+  scale_color_manual(values = c("significant" = "red", "not significant" = "black")) + 
+
+  coord_cartesian(xlim = c(-0.1, 0.15)) +  
+  labs(color = "Significance", 
+       x = "Log2 Fold Change", y = "Compound") +  
+  theme_linedraw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_line(color = "lightgray", size = 0.5), legend.position = "none")
+
+ggsave("figures/fold_change.plot.png", fold_change.plot, width = 10, height = 10)
+ggsave("figures/fold_change.plot.pdf", fold_change.plot, width = 10, height = 10)
+
+
+
+```
+
+
+```{r}
+# Function to apply Box-Cox transformation
+box_cox_transform <- function(x) {
+  bc <- boxcox(x ~ 1, lambda = seq(-2, 2, 0.1), plotit = FALSE)
+  lambda <- bc$x[which.max(bc$y)]
+  if (lambda == 0) {
+    return(log(x))
+  } else {
+    return((x^lambda - 1) / lambda)
+  }
+}
+
+# Apply Box-Cox transformation
+merged_filtered.df <- merged_filtered.df %>%
+  group_by(npclassifier_superclass) %>%
+  mutate(boxcox_intensity = box_cox_transform(shifted_intensity)) %>%
+  ungroup()
+
+merged_filtered.df <- merged_filtered.df %>%
+  group_by(npclassifier_superclass) %>%
+  mutate(
+    normalized_intensity = (boxcox_intensity - mean(boxcox_intensity)) / sd(boxcox_intensity)
+  ) %>%
+  ungroup()
+
+merged_filtered.df%>%
+  pull(normalized_intensity)%>%
+  normalTest(method = "da")
+
+# Step 3: Log transformation (base 10)
+merged_filtered.df <- merged_filtered.df %>%
+  mutate(trans_values = log(shifted_intensity))  # Adding 1 to handle zero values before log transformation
+
+
+
+
+# Step 4: Mean-centered scaling by standard deviation within each ms group
+merged_filtered.df <- merged_filtered.df %>%
+  group_by( npclassifier_superclass ) %>%
+  mutate(trans_values = (trans_values - mean(trans_values, na.rm = TRUE)) / sd(trans_values, na.rm = TRUE))
+
+hist(merged_filtered.df$trans_values)
+##plot to see normalization worked
+merged_filtered.df%>%
+ggplot(aes(y = trans_values, x = Sample)) +
+  geom_boxplot(fill = "green") +
+  labs(x = "Transformed Values", y = "Sample") +  
+  theme_minimal()+
+  coord_flip()
+
+
+
+# Group by npclassifier_superclass and summarize the counts for P and AB
+count_summary <- merged_filtered.df %>%
+  dplyr::group_by(npclassifier_superclass, ATTRIBUTE_type) %>%
+  dplyr::summarise(count = n(), .groups = 'drop') %>%
+  pivot_wider(names_from = ATTRIBUTE_type, values_from = count, values_fill = 0)
+count_summary
+
+# Calculate the mean difference for each compound superclass
+difference_df <- merged_filtered.df %>%
+  dplyr::group_by(npclassifier_superclass, ATTRIBUTE_type) %>%
+  dplyr::summarise(mean_trans_value = mean(trans_values, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = ATTRIBUTE_type, values_from = mean_trans_value) %>%
+  mutate(difference = P-AB)
+
+# Perform t-tests
+t_test_results <- merged_filtered.df %>%
+  dplyr::group_by(npclassifier_superclass) %>%
+  dplyr::summarise(
+    p_value = t.test(trans_values[ATTRIBUTE_type == "P"], 
+                     trans_values[ATTRIBUTE_type == "AB"], 
+                     var.equal = FALSE)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(significant = p_value < 0.05)
+
+# Combine results
+final_df <- difference_df %>%
+  left_join(t_test_results, by = "npclassifier_superclass")
+
+# Create the plot
+ggplot(final_df, aes(x = difference, y = reorder(npclassifier_superclass, difference))) +
+  geom_point(aes(color = significant), size = 4) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray") +
+  scale_color_manual(values = c("black", "red"), 
+                     labels = c("")) +
+  labs(x = "Difference in Transformed Values (P - AB)", 
+       y = "Compound Superclass",
+       title = "Mean Difference in Metabolite Levels Between P and AB",
+       color = "") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 10))
+
+
+
+
+```
+
+plots
+```{r}
+#fold change
+merged_filtered.df <- merged_filtered.df %>%
+  group_by(ms, Sample, npclassifier_superclass) %>%
+  mutate(fold_change = log2(
+      shifted_intensity[ATTRIBUTE_type == "P"] / 
+      shifted_intensity[ATTRIBUTE_type == "AB"]
+  )) %>%
+  summarise(
+      p_value = t.test(
+          shifted_intensity[ATTRIBUTE_type == "P"],
+          shifted_intensity[ATTRIBUTE_type == "AB"]
+      )$p.value,
+      .groups = 'drop'  # Drop groups after summarising
+  ) %>%
+  mutate(sig = ifelse(p_value > 0.05, "not significant", "significant"))
+
+
+
 #log trans
 merged_filtered.df$log_change <- log((merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "P",]$shifted_intensity)/(merged_filtered.df[merged_filtered.df$ATTRIBUTE_type == "AB",]$shifted_intensity))
 
 
 #fold change plot
-fold_change.plot<- merged_filtered.df %>%
+#treatment
+fold_change.trt.plot<- merged_filtered.df %>%
   na.omit()%>%
   ggplot(aes(x = fold_change, y = npclassifier_superclass, color = ATTRIBUTE_type)) +
   stat_summary(fun = mean, geom = "point", size = 4) +
@@ -4333,31 +4515,173 @@ fold_change.plot<- merged_filtered.df %>%
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
+final_df %>%
+  na.omit() %>%
+  ggplot(aes(x = difference, y = npclassifier_superclass)) +  # fold_change as x-axis, compound on y-axis
+  geom_point(size = 4, shape = 21, fill = "grey60") +  # Single point per compound
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+
 ggsave("figures/fold_change.plot.png", fold_change.plot, width = 9, height = 8)
 ggsave("figures/fold_change.plot.pdf", fold_change.plot, width = 9, height = 8)
 
+#site
+merged_filtered.df %>%
+  na.omit()%>%
+  ggplot(aes(x = fold_change, y = npclassifier_superclass, color = ATTRIBUTE_TreeID, shape = ATTRIBUTE_Treenum)) +
+  stat_summary(fun = mean, geom = "point", size = 4) +
+  scale_color_manual(values = c("HOK" = "grey60", "SEK" = "black"), labels = c("Hoko", "Sekiu")) + 
+  scale_shape_discrete() + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red3", size = 1) +  # Add vertical dashed line at x = 0
+  labs(color = "River", 
+       x = "Log2 Fold Change", y = "Compound") +  # Update axis labels
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+
 #####
 #plot
-merged_filtered.df%>%
-   ggplot(aes(x = ATTRIBUTE_type, y = log(Intensity), fill = npclassifier_superclass, shape = npclassifier_superclass))+
+merged_filtered.df %>%
+  na.omit()%>%
+  ggplot(aes(y = log(Intensity), x = npclassifier_superclass, color = ATTRIBUTE_type)) +
+  stat_summary(fun = mean, geom = "point", size = 4, position = position_dodge(width = 0.5)) +
+  scale_color_manual(values = c("AB" = "grey60", "P" = "black"), labels = c("resident absence", "resident presence")) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red3", size = 1) +  # Add vertical dashed line at x = 0
+  labs(color = "Treatment", 
+       x = "Log2 Fold Change", y = "Compound") +  # Update axis labels
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+half_boxviolin.plot<- merged_filtered.df%>%
+  filter(npclassifier_superclass != "Aromatic polyketides" & log_trans > 0) %>%  # Filter out Aromatic polyketides and keep log_trans > 0
+   ggplot(aes(x = ATTRIBUTE_type, y = log_trans, fill = npclassifier_superclass, shape = npclassifier_superclass))+
   geom_boxplot(position = position_dodge(width = 0.6), alpha = 0.7, width = 0.45) +
-  geom_point(position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.6), size = 2, alpha = 0.6) +
+        geom_flat_violin(alpha = 0.4, position = position_dodge(width = 0.5))+
   scale_fill_viridis_d() +
   scale_shape_manual(values = c("Diarylheptanoids" = 1, "Phenolic acids (C6-C1)" = 2, "Flavonoids" = 3, "Lignans" = 5 , "Jasmonic acids" = 6, "Aromatic polyketides" = 7 , "Phenylpropanoids (C6-C3)" = 8, "Apocarotenoids" = 9, "Saccharides" = 10))+
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.6), color = "red2", alpha = 0.9) + # Add mean points
   labs(fill = "Compound Superclass", shape = "Compound Superclass", x = "Treatment", y = expression("Log(Peak Intensity)")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
-  facet_grid(~npclassifier_superclass)+
+  facet_grid(~npclassifier_superclass, space = "free_x")+
   theme_bw() +
-  theme(axis.text = element_text(size = 18),
-        axis.title = element_text(size = 18),
-        legend.text = element_text(size = 18),
-        legend.title = element_text(size = 18))
+  theme(axis.text = element_text(size = 24),
+        axis.title = element_text(size = 24),
+        legend.text = element_text(size = 24),
+        legend.title = element_text(size = 24),
+        strip.text.x = element_text(size = 13.5))
+
+ggsave("figures/half_boxviolin.plot.pdf", half_boxviolin.plot, width = 20, height = 6)
 
 
+hist(log(merged_filtered.df$Intensity))
 
+"%||%" <- function(a, b) {
+  if (!is.null(a)) a else b
+}
+
+geom_flat_violin <- function(mapping = NULL, data = NULL, stat = "ydensity",
+                        position = "dodge", trim = TRUE, scale = "area",
+                        show.legend = NA, inherit.aes = TRUE, ...) {
+  layer(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = GeomFlatViolin,
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = list(
+      trim = trim,
+      scale = scale,
+      ...
+    )
+  )
+}
+
+#' @rdname ggplot2-ggproto
+#' @format NULL
+#' @usage NULL
+#' @export
+GeomFlatViolin <-
+  ggproto("GeomFlatViolin", Geom,
+          setup_data = function(data, params) {
+            data$width <- data$width %||%
+              params$width %||% (resolution(data$x, FALSE) * 0.9)
+            
+            # ymin, ymax, xmin, and xmax define the bounding rectangle for each group
+            data %>%
+              group_by(group) %>%
+              mutate(ymin = min(y),
+                     ymax = max(y),
+                     xmin = x,
+                     xmax = x + width / 2)
+            
+          },
+          
+          draw_group = function(data, panel_scales, coord) {
+            # Find the points for the line to go all the way around
+            data <- transform(data, xminv = x,
+                              xmaxv = x + violinwidth * (xmax - x))
+            
+            # Make sure it's sorted properly to draw the outline
+            newdata <- rbind(plyr::arrange(transform(data, x = xminv), y),
+                             plyr::arrange(transform(data, x = xmaxv), -y))
+            
+            # Close the polygon: set first and last point the same
+            # Needed for coord_polar and such
+            newdata <- rbind(newdata, newdata[1,])
+            
+            ggplot2:::ggname("geom_flat_violin", GeomPolygon$draw_panel(newdata, panel_scales, coord))
+          },
+          
+          draw_key = draw_key_polygon,
+          
+          default_aes = aes(weight = 1, colour = "grey20", fill = "white", size = 0.5,
+                            alpha = NA, linetype = "solid"),
+          
+          required_aes = c("x", "y")
+)
+
+merged_filtered.df%>%
+   ggplot(aes(x = ATTRIBUTE_type, y = log_trans, fill = npclassifier_superclass, shape = npclassifier_superclass))+
+  geom_flat_violin()+
+  geom_point(aes(color = npclassifier_superclass), 
+             position = position_jitter(w = .15), 
+             size = 1,
+             alpha = 0.4,
+             show.legend = F) +
+  geom_boxplot(width = .25, 
+               outlier.shape = NA,
+               alpha = 0.5) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d()  +
+  labs(x = "Treatment",
+       y = "log(peak intensity)",
+       fill = "Compound",
+       ) +
+  guides(fill = guide_legend(nrow=1,
+                             byrow=TRUE))+
+  theme(legend.position = "bottom",
+        legend.margin = margin(-5, 0, 0, 0))
 
 ```
+
 
 
 ```{r}
