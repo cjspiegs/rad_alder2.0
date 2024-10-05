@@ -4294,7 +4294,6 @@ merged_df<- merge(merged_df,features.df, by = "ms")
 #filter compounds of interest
 merged_filtered.df<- merged_df%>%
   filter(npclassifier_superclass == "Diarylheptanoids" | npclassifier_superclass == "Phenolic acids (C6-C1)" | npclassifier_superclass == "Flavonoids" | npclassifier_superclass == "Lignans" |
-           npclassifier_superclass == "Jasmonic acids" |
            npclassifier_superclass == "Aromatic polyketides" |
            npclassifier_superclass == "Phenylpropanoids (C6-C3)" |
            npclassifier_superclass == "Apocarotenoids" |
@@ -4304,12 +4303,71 @@ merged_filtered.df<- merged_df%>%
 merged_filtered.df<- merged_filtered.df%>%
   mutate(log_trans = log(Intensity + 1))
 
-
+#how many features:
 count_summary <- merged_filtered.df %>%
   dplyr::group_by(npclassifier_superclass, ATTRIBUTE_type) %>%
   dplyr::summarise(count = n(), .groups = 'drop') %>%
   pivot_wider(names_from = ATTRIBUTE_type, values_from = count, values_fill = 0)
 count_summary
+
+#custom labels
+custom_facet_labels <- c(
+  "Diarylheptanoids" = "Diarylheptanoids\n n = 220",
+  "Phenolic acids (C6-C1)" = "Phenolic Acids\n n = 320 ",
+  "Flavonoids" = "Flavonoids\n n = 280",
+  "Lignans" = "Lignans\n n = 60",
+  "Phenylpropanoids (C6-C3)" = "Phenylpropanoids\n n = 100",
+  "Apocarotenoids" = "Apocarotenoids\n n = 80",
+  "Saccharides" = "Saccharides\n n = 140"
+)
+
+custom_legend_labels <- c(
+  "Diarylheptanoids" = "Diarylheptanoids",
+  "Phenolic acids (C6-C1)" = "Phenolic Acids",
+  "Flavonoids" = "Flavonoids",
+  "Lignans" = "Lignans",
+  "Phenylpropanoids (C6-C3)" = "Phenylpropanoids",
+  "Apocarotenoids" = "Apocarotenoids",
+  "Saccharides" = "Saccharides"
+)
+x_axis_labels<- c("absence", "presence")
+
+### USE THIS ONE ####
+half_boxviolin.plot<- merged_filtered.df%>%
+  filter(npclassifier_superclass != "Aromatic polyketides" & log_trans > 0) %>%  # Filter out Aromatic polyketides and keep log_trans > 0
+   ggplot(aes(x = ATTRIBUTE_type, y = log_trans, fill = npclassifier_superclass))+
+  geom_boxplot(position = position_dodge(width = 0.6), alpha = 0.85, width = 0.45) +
+        geom_flat_violin(alpha = 0.3, position = position_dodge(width = 0.5))+
+  scale_fill_viridis_d(labels = custom_legend_labels) +
+  scale_x_discrete(labels = x_axis_labels, position = "bottom")+
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.6), color = "white", alpha = 0.9) + 
+  labs(fill = "Compound Superclass", shape = "Compound Superclass", x = "Treatment", y = expression("Log(Peak Intensity)")) +
+  facet_grid(~npclassifier_superclass, labeller = labeller(npclassifier_superclass = custom_facet_labels))+
+  theme_bw() +
+  theme(axis.text = element_text(size = 24),
+        axis.title = element_text(size = 24),
+        legend.text = element_text(size = 24),
+        legend.title = element_text(size = 24),
+        strip.text.x = element_text(size = 15),
+        axis.text.x.bottom = element_text(angle = 30),
+        legend.position = "none")
+half_boxviolin.plot
+
+ggsave("figures/half_boxviolin.plot.pdf", half_boxviolin.plot, width = 20, height = 8)
+
+#Perform t-tests
+t_test_results <- merged_filtered.df %>%
+  dplyr::group_by(npclassifier_superclass) %>%
+  dplyr::summarise(
+    p_value = t.test(log_trans[ATTRIBUTE_type == "P"], 
+                     log_trans[ATTRIBUTE_type == "AB"], 
+                     var.equal = FALSE)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(significant = p_value < 0.05)
+
+View(t_test_results)
+
 
 ###apply box cox model
 model <- lm(shifted_values ~ ATTRIBUTE_type, data = merged_filtered.df)
@@ -4568,25 +4626,6 @@ merged_filtered.df %>%
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-half_boxviolin.plot<- merged_filtered.df%>%
-  filter(npclassifier_superclass != "Aromatic polyketides" & log_trans > 0) %>%  # Filter out Aromatic polyketides and keep log_trans > 0
-   ggplot(aes(x = ATTRIBUTE_type, y = log_trans, fill = npclassifier_superclass, shape = npclassifier_superclass))+
-  geom_boxplot(position = position_dodge(width = 0.6), alpha = 0.7, width = 0.45) +
-        geom_flat_violin(alpha = 0.4, position = position_dodge(width = 0.5))+
-  scale_fill_viridis_d() +
-  scale_shape_manual(values = c("Diarylheptanoids" = 1, "Phenolic acids (C6-C1)" = 2, "Flavonoids" = 3, "Lignans" = 5 , "Jasmonic acids" = 6, "Aromatic polyketides" = 7 , "Phenylpropanoids (C6-C3)" = 8, "Apocarotenoids" = 9, "Saccharides" = 10))+
-  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.6), color = "red2", alpha = 0.9) + # Add mean points
-  labs(fill = "Compound Superclass", shape = "Compound Superclass", x = "Treatment", y = expression("Log(Peak Intensity)")) +
-  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
-  facet_grid(~npclassifier_superclass, space = "free_x")+
-  theme_bw() +
-  theme(axis.text = element_text(size = 24),
-        axis.title = element_text(size = 24),
-        legend.text = element_text(size = 24),
-        legend.title = element_text(size = 24),
-        strip.text.x = element_text(size = 13.5))
-
-ggsave("figures/half_boxviolin.plot.pdf", half_boxviolin.plot, width = 20, height = 6)
 
 
 hist(log(merged_filtered.df$Intensity))
