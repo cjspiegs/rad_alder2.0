@@ -5503,22 +5503,42 @@ isotopes
 ```{r}
 #load data
 isotope.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/isotopes.csv") 
+View()
+
+isotope.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/isotopes/kosher_gherkin_alder_data.csv")
+View(isotope.df)
 
 #add new columns
 isotope.df<- isotope.df%>%
-  group_by(treatment, tree_id, site_num, tree_num)%>%
-   mutate(total_c.g = total_C / 10^6,
-         total_n.g = total_N / 10^6,
-         c_n = total_c.g / total_n.g,
-         weight.g = weight / 1000,
-         perc.c = (total_c.g / weight.g) * 100,
-         perc.n = (total_n.g / weight.g) * 100)
+  group_by(treatment, tree_origin, origin_site, tree_num, deploy, deploy_site, day)%>%
+   mutate(weight.g = sample_weight/1000,
+     totalC.g = totalC / 10^6,
+          totalC.weight = totalC.g/weight.g,
+          totalC.norm = totalC.g/0.003,
+          totalN.g = totalN / 10^6,
+          totalN.weight = totalN.g/weight.g,
+          totalN.norm = totalN.g/0.003,
+         c_n = totalC.norm / totalN.norm,
+        log.c_n = log(c_n),
+         perc.c = (totalC.norm) * 100,
+         perc.n = (totalN.norm) * 100)
+
+
+isotope.df$scaled_d13C<- scale(isotope.df$delta13C)
+isotope.df$scaled_d15N<- scale(isotope.df$delta15N)
 
 #assign class
 isotope.df$treatment<- as.factor(isotope.df$treatment)
 isotope.df$tree_id<- as.factor(isotope.df$tree_id)
 isotope.df$site_num<- as.factor(isotope.df$site_num)
 isotope.df$tree_num<- as.factor(isotope.df$tree_num)
+
+#distribution
+hist(log(isotope.df$c_n))
+hist(isotope.df$delta15N)
+hist(scale(isotope.df$delta13C))
+hist(scale(isotope.df$delta15N))
+
 ```
 
 figures
@@ -5547,7 +5567,7 @@ isotope.df%>%
 ####C:N stats and plot
 #mean plot
 c_n_mean.plot<- isotope.df%>%
-  ggplot(aes(treatment, c_n, color = treatment, shape = treatment))+
+  ggplot(aes(treatment, log(c_n), color = treatment, shape = treatment))+
   stat_summary(fun = mean, geom = "point", size = 5, position = position_dodge(width = 0.5)) +
   stat_summary(fun.data = mean_cl_normal, geom = "errorbar", width = 0.4, position = position_dodge(width = 0.5), size = 1) +
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
@@ -5560,17 +5580,19 @@ geom_hline(aes(yintercept = mean(c_n)), color = "red3", linetype = "dashed") +
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
+c_n_mean.plot
 
 ggsave("figures/c_n.plot.png", c_n.plot, width = 14, height = 7)
 
 #boxplot
 c_n_boxplot<- isotope.df %>%
-  ggplot(aes(x = as.factor(treatment), y = c_n, fill = treatment, shape = treatment)) +
+  ggplot(aes(x = as.factor(treatment), y = log.c_n, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
   scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
   labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("C:N")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
   theme_bw() +
@@ -5580,11 +5602,90 @@ c_n_boxplot<- isotope.df %>%
         legend.title = element_text(size = 18),
         plot.margin = margin(15,10,10,10))
 
+c_n_boxplot
+
 ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 10, height = 8)
 
-#c:n stats
-t.test(isotope.df[isotope.df$treatment == "P",]$c_n,isotope.df[isotope.df$treatment == "AB",]$c_n)
+#delta 13 C boxplot
+d13C.boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = scaled_d13C, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("delta 13C")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
   
+d13C.boxplot
+
+#delta 15 N boxplot
+d15N.boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = scaled_d15N, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("delta 15N")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
+  
+d15N.boxplot
+
+#total C boxplot
+totalC.boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = totalC, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("total C")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
+  
+totalC.boxplot
+  
+
+#total N boxplot
+totalN.boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = totalN, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("total N")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
+  
+totalN.boxplot
   
 ```
 
@@ -5612,6 +5713,7 @@ perc_n_mean.plot<- isotope.df%>%
   scale_color_manual(values = c("AB" = "black", "P" = "grey60"), labels = c("absent", "present")) +
     scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
 geom_hline(aes(yintercept = mean(perc.n)), color = "red3", linetype = "dashed") +
+  facet_grid(~day)+
     scale_y_continuous(breaks = seq(1.7, 2.75, by = 0.06))+
    labs(x = "Treatment", y = "Nitrogen (%)") +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16))))+
@@ -5620,17 +5722,19 @@ geom_hline(aes(yintercept = mean(perc.n)), color = "red3", linetype = "dashed") 
         axis.title = element_text(size = 18),
         legend.text = element_text(size = 18),
         legend.title = element_text(size = 18))
+perc_n_mean.plot
 
 ggsave("figures/perc_n.plot.png", perc_n.plot, width = 14, height = 7)
 
 #boxplot
-perc_n_boxplot<- isotope.df %>%
+per_n.boxplot<- isotope.df %>%
   ggplot(aes(x = as.factor(treatment), y = perc.n, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
   scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
   labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("% Nitrogen")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
   theme_bw() +
@@ -5786,22 +5890,23 @@ perc.C.table$cld <- perc.C.cld$Letters
 
 #plot
 perc.C.plot=isotope.df %>%
-  ggplot(aes(x = treatment, y = perc.C, fill = treatment)) +
+  ggplot(aes(x = treatment, y = perc.c, fill = treatment)) +
   geom_boxplot(alpha = 0.6) +
   xlab("treatment")+
   ylab("% C")+
-  geom_point(aes(shape = as.factor(site_num)), position = position_jitter(width = 0.15))+
+  geom_point(aes(shape = as.factor(deploy_site)), position = position_jitter(width = 0.15))+
 scale_color_manual(values = c("#CC79A7", "#009E73")) +
     scale_fill_manual(values = c("#CC79A7", "#009E73")) +
-  geom_hline(aes(yintercept = mean(perc.C), linetype = "Average"), color = alpha("red", 1), linetype = "dashed") +
+  geom_hline(aes(yintercept = mean(perc.c), linetype = "Average"), color = alpha("red", 1), linetype = "dashed") +
+  facet_grid(~day)+
   theme_classic()+
   theme(plot.title = element_text(face = "bold"))+
-  geom_text(data = perc.C.table, aes(y = quant, label = cld), color = "blue", fontface= "bold",size = 5, vjust=-2, hjust =-0.76)+
   theme_classic()
-
+perc.C.plot
 
 # %N
-perc.N.aov=aov(perc.N ~ treatment, data =isotope.df)
+library(multcompView)
+perc.N.aov=aov(perc.n ~ treatment, data =isotope.df)
 perc.N.tHSD=TukeyHSD(perc.N.aov, ordered = F, conf.level = 0.95)
 perc.N.cld <- multcompLetters4(perc.N.aov, d15N.tHSD)
 
@@ -5817,18 +5922,20 @@ perc.N.table$cld <- perc.N.cld$Letters
 
 #plot
 perc.N.plot=isotope.df %>%
-  ggplot(aes(x = treatment, y = perc.N, fill = treatment)) +
+  ggplot(aes(x = treatment, y = perc.n, fill = treatment)) +
   geom_boxplot(alpha = 0.6) +
   xlab("treatment")+
   ylab("% N")+
-  geom_point(aes(shape = as.factor(site_num)), position = position_jitter(width = 0.15))+
+  geom_point(aes(shape = as.factor(deploy_site)), position = position_jitter(width = 0.15))+
  scale_color_manual(values = c("#CC79A7", "#009E73")) +
     scale_fill_manual(values = c("#CC79A7", "#009E73")) +
-  geom_hline(aes(yintercept = mean(perc.N), linetype = "Average"), color = alpha("red", 1), linetype = "dashed") +
+  geom_hline(aes(yintercept = mean(perc.n), linetype = "Average"), color = alpha("red", 1), linetype = "dashed") +
+  facet_grid(~day)+
   theme_classic()+
   theme(plot.title = element_text(face = "bold"))+
-  geom_text(data = perc.N.table, aes(y = quant, label = cld), color = "blue", fontface= "bold",size = 5, vjust=-2, hjust =-0.76)+
   theme_classic()
+
+perc.N.plot
 
 prelim.isotope.plot=plot_grid(
   C_N.plot,
