@@ -5502,26 +5502,38 @@ adonis2(pos_dist_metabolites_ra ~ PCA_whole_ra_scores_pos$Attribute_TreeID, PCA_
 isotopes
 ```{r}
 #load data
-isotope.df<- read.csv("/Users/cjspiegel/Desktop/GitHub/rad_alder2.0/data/isotopes.csv") 
-View()
+isotope.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/isotopes/alder_isotopes_0_7_19_2024.csv")
 
-isotope.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/isotopes/kosher_gherkin_alder_data.csv")
-View(isotope.df)
-
-#add new columns
+#normalize and create c:n column
 isotope.df<- isotope.df%>%
-  group_by(treatment, tree_origin, origin_site, tree_num, deploy, deploy_site, day)%>%
-   mutate(weight.g = sample_weight/1000,
-     totalC.g = totalC / 10^6,
-          totalC.weight = totalC.g/weight.g,
-          totalC.norm = totalC.g/0.003,
-          totalN.g = totalN / 10^6,
-          totalN.weight = totalN.g/weight.g,
-          totalN.norm = totalN.g/0.003,
-         c_n = totalC.norm / totalN.norm,
+  group_by(treatment, origin_tree, origin_site, tree_num, deploy_site, deploy_num, day)%>%
+   mutate(
+     totalC.mg = totalC_ug / 10^3,
+          totalC.weight = totalC.mg/sample_weight_mg,
+          totalN.mg = totalN_ug / 10^3,
+          totalN.weight = totalN.mg/sample_weight_mg,
+         c_n = totalC.weight / totalN.weight,
         log.c_n = log(c_n),
-         perc.c = (totalC.norm) * 100,
-         perc.n = (totalN.norm) * 100)
+         perc.c = (totalC.weight) * 100,
+         perc.n = (totalN.weight) * 100)
+
+isotope.df %>%
+  group_by(treatment, origin_tree, origin_site, tree_num, deploy_site, deploy_num, day)%>%
+  mutate(
+    # Extract day 0 values directly for each sample
+    d13C_day0 = first(d13C[day ==0]),
+    d15N_day0 = first(d15N[day == 0]),
+    N_day0 = first(totalN.weight[day == 0]),
+    C_day0 = first(totalC.weight[day == 0]),
+    
+    # Calculate percent change for each day based on day 0
+    perc_change_d15N = ifelse(day == 0, 0, ((d15N - d15N_day0) / d15N_day0) * 100),
+    perc_change_N = ifelse(day == 0, 0, ((totalN.weight - N_day0) / N_day0) * 100),
+    perc_change_C = ifelse(day == 0, 0, ((totalC.weight - C_day0) / C_day0) * 100)
+  ) %>%
+  ungroup()
+
+
 
 
 isotope.df$scaled_d13C<- scale(isotope.df$delta13C)
@@ -5535,7 +5547,8 @@ isotope.df$tree_num<- as.factor(isotope.df$tree_num)
 
 #distribution
 hist(log(isotope.df$c_n))
-hist(isotope.df$delta15N)
+hist(isotope.df$c_n)
+hist(isotope.df$d15N)
 hist(scale(isotope.df$delta13C))
 hist(scale(isotope.df$delta15N))
 
@@ -5608,7 +5621,7 @@ ggsave("figures/c_n_boxplot.png", c_n_boxplot, width = 10, height = 8)
 
 #delta 13 C boxplot
 d13C.boxplot<- isotope.df %>%
-  ggplot(aes(x = as.factor(treatment), y = scaled_d13C, fill = treatment, shape = treatment)) +
+  ggplot(aes(x = as.factor(treatment), y = d13C, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
@@ -5628,7 +5641,7 @@ d13C.boxplot
 
 #delta 15 N boxplot
 d15N.boxplot<- isotope.df %>%
-  ggplot(aes(x = as.factor(treatment), y = scaled_d15N, fill = treatment, shape = treatment)) +
+  ggplot(aes(x = as.factor(treatment), y = d15N, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
@@ -5647,15 +5660,15 @@ d15N.boxplot<- isotope.df %>%
 d15N.boxplot
 
 #total C boxplot
-totalC.boxplot<- isotope.df %>%
-  ggplot(aes(x = as.factor(treatment), y = totalC, fill = treatment, shape = treatment)) +
+perc.c.boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = perc.c, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
   scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
   facet_grid(~day)+
-  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("total C")) +
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("% C")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
   theme_bw() +
   theme(axis.text = element_text(size = 18),
@@ -5668,15 +5681,15 @@ totalC.boxplot
   
 
 #total N boxplot
-totalN.boxplot<- isotope.df %>%
-  ggplot(aes(x = as.factor(treatment), y = totalN, fill = treatment, shape = treatment)) +
+perc.n.boxplot<- isotope.df %>%
+  ggplot(aes(x = as.factor(treatment), y = perc.n, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
   stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
   scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
   scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
   facet_grid(~day)+
-  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("total N")) +
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("% N")) +
   guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
   theme_bw() +
   theme(axis.text = element_text(size = 18),
@@ -5686,7 +5699,13 @@ totalN.boxplot<- isotope.df %>%
         plot.margin = margin(15,10,10,10))
   
 totalN.boxplot
-  
+
+
+#plot grid
+all.days_isotope.plot<- plot_grid(c_n_boxplot, d13C.boxplot, d15N.boxplot, perc.n.boxplot, perc.c.boxplot, nrow= 5, rel_widths = c(3,3,3,3,3))
+
+ggsave("figures/all.days_isotope.plot.png", all.days_isotope.plot, width = 12, height = 16)
+
 ```
 
 
