@@ -5517,38 +5517,30 @@ isotope.df<- isotope.df%>%
          perc.c = (totalC.weight) * 100,
          perc.n = (totalN.weight) * 100)
 
-isotope.df %>%
-  group_by(treatment, origin_tree, origin_site, tree_num, deploy_site, deploy_num, day)%>%
-  mutate(
-    # Extract day 0 values directly for each sample
-    d13C_day0 = first(d13C[day ==0]),
-    d15N_day0 = first(d15N[day == 0]),
-    N_day0 = first(totalN.weight[day == 0]),
-    C_day0 = first(totalC.weight[day == 0]),
-    
-    # Calculate percent change for each day based on day 0
-    perc_change_d15N = ifelse(day == 0, 0, ((d15N - d15N_day0) / d15N_day0) * 100),
-    perc_change_N = ifelse(day == 0, 0, ((totalN.weight - N_day0) / N_day0) * 100),
-    perc_change_C = ifelse(day == 0, 0, ((totalC.weight - C_day0) / C_day0) * 100)
-  ) %>%
-  ungroup()
+isotope.df$scaled.c_n<- scale(isotope.df$c_n)
+isotope.df$scaled.d15N<- scale(isotope.df$d15N)
+isotope.df$scaled.d13C<- scale(isotope.df$d13C)
+
+#assign home and away
+isotope.df$group <- 
+  ifelse(
+  isotope.df$origin_tree == "HOK" & isotope.df$deploy_site == "HOK", "H",
+   ifelse(
+  isotope.df$origin_tree == "SEK" & isotope.df$deploy_site == "SEK", "H",
+   ifelse(
+   isotope.df$origin_tree == "HOK" & isotope.df$deploy_site == "SEK", "AW",
+   ifelse(
+   isotope.df$origin_tree == "SEK" & isotope.df$deploy_site == "HOK", "AW", NA  # Default value if none of the conditions are met
+                )
+              )
+            )
+          )
 
 
-
-
-isotope.df$scaled_d13C<- scale(isotope.df$delta13C)
-isotope.df$scaled_d15N<- scale(isotope.df$delta15N)
-
-#assign class
-isotope.df$treatment<- as.factor(isotope.df$treatment)
-isotope.df$tree_id<- as.factor(isotope.df$tree_id)
-isotope.df$site_num<- as.factor(isotope.df$site_num)
-isotope.df$tree_num<- as.factor(isotope.df$tree_num)
-
-#distribution
+#data distribution
 hist(log(isotope.df$c_n))
-hist(isotope.df$c_n)
-hist(isotope.df$d15N)
+hist(isotope.df$scaled.c_n,breaks = 4)
+  hist(isotope.df$scaled.c_n)
 hist(scale(isotope.df$delta13C))
 hist(scale(isotope.df$delta15N))
 
@@ -5556,17 +5548,16 @@ hist(scale(isotope.df$delta15N))
 
 figures
 ```{r}
+View(isotope.df)
 #### isotope analysis
 #explore the data
 #checking normality
 isotope.df%>%
-  filter(treatment == "AB")%>%
-  pull(c_n)%>%
+  pull(scaled.c_n)%>%
   normalTest(method = "da")
 #checking normality
 isotope.df%>%
-  filter(treatment == "P")%>%
-  pull(perc.n)%>%
+  pull(d13C)%>%
   normalTest(method = "da")
 #check means
 isotope.df%>%
@@ -5639,6 +5630,24 @@ d13C.boxplot<- isotope.df %>%
   
 d13C.boxplot
 
+isotope.df %>%
+  filter(group == "H")%>%
+  ggplot(aes(x = as.factor(treatment), y = scaled.c_n, fill = treatment, shape = treatment)) +
+  geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+  stat_summary(fun = "mean", geom = "point", size = 3, position = position_dodge(width = 0.75), color = "red2", alpha = 0.9) + # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("scaled C:N")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
+
 #delta 15 N boxplot
 d15N.boxplot<- isotope.df %>%
   ggplot(aes(x = as.factor(treatment), y = d15N, fill = treatment, shape = treatment)) +
@@ -5661,6 +5670,7 @@ d15N.boxplot
 
 #total C boxplot
 perc.c.boxplot<- isotope.df %>%
+    filter(group == "H")%>%
   ggplot(aes(x = as.factor(treatment), y = perc.c, fill = treatment, shape = treatment)) +
   geom_boxplot(position = position_dodge(width = 0.75), alpha = 0.7, width = 0.45) +
   geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
@@ -5677,7 +5687,7 @@ perc.c.boxplot<- isotope.df %>%
         legend.title = element_text(size = 18),
         plot.margin = margin(15,10,10,10))
   
-totalC.boxplot
+perc.c.boxplot
   
 
 #total N boxplot
@@ -5698,7 +5708,45 @@ perc.n.boxplot<- isotope.df %>%
         legend.title = element_text(size = 18),
         plot.margin = margin(15,10,10,10))
   
-totalN.boxplot
+perc.n.boxplot
+
+#d15N against c:n
+d15N_c_n_boxplot
+isotope.df %>%
+  filter(group == "H")%>%
+  ggplot(aes(x = scaled.c_n, y = scaled.d15N, fill = treatment, shape = treatment)) +
+  geom_smooth() +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+   # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "Treatment", y = expression("C:N")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
+
+d15N_c_n_boxplot
+isotope.df %>%
+  ggplot(aes(x = scaled.d13C , y = scaled.d15N, fill = treatment, shape = treatment)) +
+  geom_smooth(formula = y~x, method = "lm") +
+  geom_point(position = position_jitter(width = 0.1), size = 2, alpha = 0.4) + # Add jitter and reduce point size for raw data
+   # Add mean points
+  scale_fill_manual(values = c("P" = "black", "AB" = "grey60"), labels = c("absent", "present")) +
+  scale_shape_manual(values = c("AB" = 17, "P" = 16), labels = c("absent", "present")) +
+  facet_grid(~day)+
+  labs(fill = "Treatment", shape = "Treatment", x = "d13C", y = expression("d15N")) +
+  guides(color = guide_legend(override.aes = list(shape = c(17, 16)))) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 18),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 18),
+        legend.title = element_text(size = 18),
+        plot.margin = margin(15,10,10,10))
 
 
 #plot grid
