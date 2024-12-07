@@ -4261,6 +4261,57 @@ ggplot(filtered_df_long, aes(x = intensity, y = id)) +
 
 
 ```
+days 3, 7, 19 chemistry
+```{r}
+#load quant data
+all.chem.days.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/all_days/mzmine_output/all_days_negative_alder_2024_quant.csv")
+
+#create HFA column
+all.chem.days.df<- all.chem.days.df %>%
+  mutate(hfa = ifelse(origin == "HOK" & deploy_site == "HOK", "home", 
+            ifelse(origin == "HOK" & deploy_site == "SEK", "away", 
+            ifelse(origin == "SEK" & deploy_site == "SEK", "home", 
+            ifelse(origin == "SEK" & deploy_site == "HOK", "away", NA)))))%>%
+  dplyr::select(1:10, hfa, everything())
+
+#reshape so ms and intensity are in rows
+all.chem.days.df<- all.chem.days.df %>%
+  pivot_longer(
+    cols = starts_with("MS_"),      # Select all MS columns
+    names_to = "ms",                # Create a new column 'ms' with the MS_ labels
+    values_to = "intensity"         # Create a new column 'intensity' for the peak intensities
+  )
+
+
+#load gnps library results
+gnps_all.chem.days.df<- read.csv("/Users/cjspiegel/Desktop/Projects/rad_alder/alder_metabolomics_2024/Negative/all_days/mzmine_output/edited_library_results_2024.csv")
+
+#create new df with annotations
+annotated.df<- all.chem.days.df %>%
+  left_join(gnps_all.chem.days.df, by = "ms")
+
+#add log trans column
+annotated.df<- annotated.df%>%
+  mutate(log.intensity = log(intensity + 1))
+
+annotated.df%>%
+  na.omit()
+
+#plot
+annotated.df%>%
+  na.omit()%>%
+  filter(log.intensity > 0 & hfa == "home")%>%
+  ggplot(aes(x = as.numeric(day), y = log.intensity))+
+  geom_smooth(aes(fill = treatment))+
+  facet_wrap(~np_superclass)+
+  theme_bw()
+
+
+
+
+
+
+```
 
 
 Day 0 alder chemistry
